@@ -1,8 +1,10 @@
 # RF-SWD-ELL-MT-PMPI
 
-This project presents probabilistic single- and multi-physics inversion with variable-complexity of one-dimensional receiver function, surface (fundamental mode Rayleigh) wave dispersion, rayleigh wave ellipticity, and magnetotelluric data as decribed in the following paper:
+This project presents probabilistic single- and multi-physics inversion with variable-complexity of one-dimensional receiver function, surface wave dispersion, rayleigh wave ellipticity, and magnetotelluric data as decribed in the following conferences and papers:
 
-Shahsavari, P., Dettmer, J., Unsworth, M. J., & Schaeffer, A. (2025). Multiphysics inversion with variable complexity of receiver-function, surface-wave dispersion and magnetotelluric data reduces uncertainty for lithosphere structure. arXiv preprint arXiv:2510.15779. (Submitted to Geophysicsl Journal International)
+Shahsavari, P., Dettmer, J., Unsworth, M. J., & Schaeffer, A. (2022). Data and model appraisal for joint inversion of magnetotelluric, receiver function, Rayleigh wave dispersion, and horizontal to vertical amplitude ratio (HV) data. AGU Fall Meeting Abstracts, 2022, S15B-03.
+
+Shahsavari, P., Dettmer, J., Unsworth, M. J., & Schaeffer, A. (2025). Multiphysics inversion with variable complexity of receiver-function, surface-wave dispersion and magnetotelluric data reduces uncertainty for lithosphere structure. arXiv preprint: https://arxiv.org/abs/2510.15779. (Submitted to Geophysicsl Journal International)
 
 ## Installation
 NVIDIA HPC SDK must be installed. https://developer.nvidia.com/hpc-sdk \
