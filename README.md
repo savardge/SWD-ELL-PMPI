@@ -1,6 +1,6 @@
 # RF-SWD-ELL-MT-PMPI
 
-This project presents probabilistic single- and multi-physics inversion with variable-complexity of one-dimensional receiver function, surface wave dispersion, rayleigh wave ellipticity, and magnetotelluric data as decribed in the following conferences and papers:
+This project presents probabilistic single- and multi-physics inversion of one-dimensional receiver function, surface wave dispersion, rayleigh wave ellipticity, and magnetotelluric data as decribed in the following conferences and papers:
 
 Shahsavari, P., Dettmer, J., Unsworth, M. J., & Schaeffer, A. (2022). Data and model appraisal for joint inversion of magnetotelluric, receiver function, Rayleigh wave dispersion, and horizontal to vertical amplitude ratio (HV) data. AGU Fall Meeting Abstracts, 2022, S15B-03.
 
