@@ -143,9 +143,12 @@ from `receiver_rjmcmc_varpar_sourceinv_joint` (44/46-line) format.
   (-19.155037748234786), R0+R1+R2 with DVSCON (-260.50604563286140), R0+R2 via
   `MODE_OF 0 2` (-267.50804914725632), NLMX = 30 / hmin = 2 m
   (-260.50604563286140).
-- Seeded sampling runs of the two codes agree statistically (k, per-curve
-  sigma, logL); the random streams differ because the codes consume the RNG
-  differently.
+- Full-length seeded run (160k kept samples, HVC v2 R0+R1+R2 with DVSCON)
+  against the receiver code's posterior on identical inputs: depth-median
+  Vs offset 0.032 in 68%-half-width units (replicate gate 0.2), medians equal
+  to 1 m/s at every depth, identical 68% bands, per-curve sigma medians
+  24/39/25 m/s in both, identical logL and k medians. The random streams
+  differ because the codes consume the RNG differently.
 
 ## Post-processing
 
