@@ -1,8 +1,8 @@
 C                                                                       RAY02740
 C     RAYLEIGH WAVE EIGENVALUE (R-K-G VERSION)                          RAY02750
 C                                                                       RAY02760
-      SUBROUTINE  RAYDSP(DIFFEQ,H,RHO,VP,VS,AP,AE,L,                    RAY02770
-     *                   W,CMN,CMX,DC,TOL,ITR,IA,C,U,EK,                RAY02780
+      SUBROUTINE  RAYDSPN(DIFFEQ,H,RHO,VP,VS,AP,AE,L,
+     *                   W,CMN,CMX,DC,TOL,ITR,IA,MODE,C,U,EK,
      1                   Y0,YIJ,IER)                                    RAY02790
 C                                                                       RAY02800
 C     INPUT                                                             RAY02810
@@ -23,6 +23,12 @@ C       TOL  : RELATIVE ACCURACY OF PHASE VELOCITY                      RAY02950
 C       ITR  : MAXIMUM NUMBER OF ITERATIONS                             RAY02960
 C       IA   : = 0 ;   ISOTROPIC MODEL                                  RAY02970
 C              = 1 ; ANISOTROPIC MODEL                                  RAY02980
+C       MODE : MODE INDEX.  0 = FUNDAMENTAL, 1 = 1ST HIGHER, ...        HVC00010
+C              THE ROUTINE RETURNS THE (MODE+1)-TH ROOT OF THE          HVC00020
+C              DISPERSION FUNCTION ABOVE CMN, COUNTED BY SIGN           HVC00030
+C              CHANGES ON THE DC GRID.  IER = 2 IF THAT MANY            HVC00040
+C              ROOTS DO NOT EXIST IN [CMN,CMX] (E.G. THE MODE           HVC00050
+C              IS BELOW ITS CUT-OFF FREQUENCY).                         HVC00060
 C     OUTPUT                                                            RAY02990
 C       C    : PHASE VELOCITY                                           RAY03000
 C       U    : GROUP VELOCITY BY DIFFERENTIATION                        RAY03010
@@ -79,7 +85,9 @@ C    *         1PD18.6//7X,'C',17X,'Y2',16X,'Y3')                       RAY03450
 C     WRITE(6,4)  C3,F3,Y0(3)                                           RAY03520
     4   FORMAT(1P3E18.6)                                                RAY03530
 C   4   FORMAT(1P3D18.6)                                                RAY03540
-      IF( F3.EQ.0 .AND. TOL1.GT.0 )  GO TO  9                           RAY03550
+      NCROSS = 0                                                        HVC00070
+      IF( F3.EQ.0 )  NCROSS = 1                                         HVC00080
+      IF( F3.EQ.0 .AND. TOL1.GT.0 .AND. MODE.LE.0 )  GO TO  9           HVC00090
 C                                                                       RAY03560
 C     FIND A ZERO-CROSS                                                 RAY03570
 C                                                                       RAY03580
@@ -97,7 +105,9 @@ C                                                                       RAY03580
         F3 = Y0(2)                                                      RAY03700
 C       WRITE(6,4)  C3,F3,Y0(3)                                         RAY03710
         IF(  TOL1.LE.0 )  GO TO  5                                      RAY03720
-        IF( F3*SIGN(ONE,F1).LE.0 )  GO TO  6                            RAY03730
+        IF( F3*SIGN(ONE,F1).GT.0 )  GO TO  5                            HVC00100
+        NCROSS = NCROSS + 1                                             HVC00110
+        IF( NCROSS.GT.MODE )  GO TO  6                                  HVC00120
     5 CONTINUE                                                          RAY03740
 C                                                                       RAY03750
       IER = 2                                                           RAY03760
@@ -220,3 +230,18 @@ C  94 WRITE(6,95)                                                       RAY04910
      *         'ROOT NOT FOUND',3X,5('?'))                              RAY04930
       RETURN                                                            RAY04940
       END                                                               RAY04950
+C                                                                       HVC00130
+C     BACKWARD-COMPATIBLE ENTRY POINT.  IDENTICAL TO THE ORIGINAL        HVC00140
+C     DISPER-80 RAYDSP: RETURNS THE FUNDAMENTAL MODE.                    HVC00150
+C                                                                       HVC00160
+      SUBROUTINE  RAYDSP(DIFFEQ,H,RHO,VP,VS,AP,AE,L,                     HVC00170
+     *                   W,CMN,CMX,DC,TOL,ITR,IA,C,U,EK,                 HVC00180
+     1                   Y0,YIJ,IER)                                     HVC00190
+      DIMENSION  H(L),RHO(L),VP(L),VS(L),AP(L),AE(L),                    HVC00200
+     *           Y0(3),YIJ(15)                                           HVC00210
+      EXTERNAL   DIFFEQ                                                  HVC00220
+      CALL  RAYDSPN(DIFFEQ,H,RHO,VP,VS,AP,AE,L,                          HVC00230
+     *              W,CMN,CMX,DC,TOL,ITR,IA,0,C,U,EK,                    HVC00240
+     1              Y0,YIJ,IER)                                          HVC00250
+      RETURN                                                             HVC00260
+      END                                                                HVC00270

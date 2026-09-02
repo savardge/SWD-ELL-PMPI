@@ -1259,6 +1259,8 @@ TYPE (objstruc)                       :: obj
 REAL(KIND=SP),DIMENSION(maxlay,10)    :: curmod
 REAL(KIND=SP),DIMENSION(maxlay+NPREM,10):: curmod2
 REAL(KIND=SP),DIMENSION(NDAT_SWD)     :: periods,DpredSWD
+INTEGER(KIND=IB),DIMENSION(NDAT_SWD)  :: ivalidSWD
+INTEGER(KIND=IB)                      :: imode,nswd_m
 REAL(KIND=RP),DIMENSION(NMODE)        :: EtmpSWD
 REAL(KIND=RP)                         :: logL,factvs,factvpvs
 REAL(KIND=RP)                         :: tstart, tend, tcmp   ! Overall time 
@@ -1323,57 +1325,63 @@ IF(IMAP == 1)THEN
   !206   FORMAT(I3,10F12.4)
 ENDIF
 
-periods = REAL(obj%periods(1,1:NDAT_SWD),SP)
 !!
-!!  Need to append PREM perturbed by half-space perturbation here to 
-!!  ensure that long period SWD can be properly modelled. 
+!! Adjacent-layer Vs contrast constraint (indicator prior, ABSOLUTE km/s like
+!! BayHunter's lvz/hvz). Checked on the final layer stack BEFORE any forward
+!! call, so violating proposals cost nothing. Motivation: Kennett (2023, 2026,
+!! Seismica) - strong internal contrasts in compaction-gradient structures
+!! create spurious internal waveguides; without this the multi-mode posterior
+!! can be dominated by a data-fitting but geologically absurd fast-lid family.
 !!
-CALL dispersion(obj%nunique+1+NPREM,curmod2(1:obj%nunique+1+NPREM,2)/1000., & 
-     curmod2(1:obj%nunique+1+NPREM,3)/1000.,curmod2(1:obj%nunique+1+NPREM,4)/1000.,&
-     curmod2(1:obj%nunique+1+NPREM,1)/1000.,DpredSWD,&
-     periods,NDAT_SWD,ierr_swd)
-!CALL dispersion(obj%nunique+1,curmod(1:obj%nunique+1,2)/1000., & 
-!     curmod(1:obj%nunique+1,3)/1000.,curmod(1:obj%nunique+1,4)/1000.,&
-!     curmod(1:obj%nunique+1,1)/1000.,DpredSWD,&
-!     periods,NDAT_SWD,ierr_swd)
-!ALLOCATE(curmodtest(maxlay,10))
-!curmodtest = 0.0
-!curmodtest(1:obj%nunique+1,1) = (/ 40000.0, 60000.0, 100000.0, 0.0  /)
-!curmodtest(1:obj%nunique+1,2) = (/ 2593.3594, 3098.5693, 3308.5215, 3399.7598  /)
-!curmodtest(1:obj%nunique+1,3) = (/ 5600.0, 7560.0, 8160.0, 8400.0  /)
-!curmodtest(1:obj%nunique+1,4) = (/ 3200.0, 4200.0, 4800.0, 4200.0  /)
-!CALL dispersion(obj%nunique+1,curmodtest(1:obj%nunique+1,2)/1000., & 
-!     curmodtest(1:obj%nunique+1,3)/1000.,curmodtest(1:obj%nunique+1,4)/1000.,&
-!     curmodtest(1:obj%nunique+1,1)/1000.,DpredSWD,&
-!     periods,NDAT_SWD,ierr_swd)
-!IF(IMAP == 1)THEN
-!  PRINT*,'CURMODTEST IN SWD'
-!  DO ilay=1,obj%nunique+1
-!    WRITE(*,296)ilay,curmodtest(ilay,1:10)
-!  ENDDO
-!  296   FORMAT(I3,10F12.4)
-!ENDIF
-!CALL dispersion(4,(/ 2593.3594, 3098.5693, 3308.5215, 3399.7598  /)/1000., & 
-!     (/ 5600.0, 7560.0, 8160.0, 8400.0  /)/1000.,(/ 3200.0, 4200.0, 4800.0, 4200.0  /)/1000.,&
-!     (/ 40000.0, 60000.0, 100000.0, 0.0  /)/1000.,DpredSWD,&
-!     periods,NDAT_SWD,ierr_swd)
-
-IF(ierr_swd /= 0)THEN
-  !write(*,*)'THIS MODEL IS WEIRD, Cannot compute dispersion'
-  !write(*,*)'ier=',ierr_swd,'rank',rank
-  !write(*,*)'ier < 0 ; INPUT ERROR'                                 
-  !write(*,*)'ier      = 0 ; NO ERROR '                              
-  !write(*,*)'ier       = 1 ; SLOW CONVERGENCE'                      
-  !write(*,*)'ier        = 2 ; ROOT NOT FOUND'
-  !write(*,*)'-----------------------------------------------'
-  !stop
-  !CALL PRINTPAR(obj)
-  logL = -HUGE(1._RP)
-  RETURN
+IF(DVSCON > 0._RP)THEN
+  DO ilay = 1,obj%nunique
+    IF(ABS(curmod2(ilay+1,4)-curmod2(ilay,4)) > DVSCON*1000._RP)THEN
+      logL = -HUGE(1._RP)
+      RETURN
+    ENDIF
+  ENDDO
 ENDIF
 
-obj%DpredSWD(1,1:NDAT_SWD) = REAL(DpredSWD,RP)
-obj%DresSWD(1,1:NDAT_SWD) = obj%DobsSWD(1,1:NDAT_SWD)-obj%DpredSWD(1,1:NDAT_SWD)
+!!
+!! Forward-model every curve slot on its OWN period grid and point count, as
+!! the Rayleigh mode MODE_OF(imode) (0 = fundamental; RAYDSPN counts roots).
+!!
+DO imode = 1,NMODE
+  nswd_m = NDAT_MODE(imode)
+  IF(nswd_m <= 0) CYCLE
+  periods = 0._SP
+  periods(1:nswd_m) = REAL(obj%periods(imode,1:nswd_m),SP)
+  !!
+  !!  Need to append PREM perturbed by half-space perturbation here to
+  !!  ensure that long period SWD can be properly modelled.
+  !!
+  CALL dispersion(obj%nunique+1+NPREM,curmod2(1:obj%nunique+1+NPREM,2)/1000., &
+       curmod2(1:obj%nunique+1+NPREM,3)/1000.,curmod2(1:obj%nunique+1+NPREM,4)/1000.,&
+       curmod2(1:obj%nunique+1+NPREM,1)/1000.,DpredSWD,&
+       periods,nswd_m,IGRP,ierr_swd,MODE_OF(imode),ivalidSWD,&
+       REAL(SWD_CMIN,SP),REAL(SWD_CMAX,SP),REAL(SWD_DC,SP))
+
+  IF(ierr_swd < 0)THEN
+    !! Hard input error in the propagator: reject.
+    logL = -HUGE(1._RP)
+    RETURN
+  ENDIF
+  !!
+  !! Every OBSERVED datum must be predictable. A model that cannot produce a
+  !! mode at a period where we actually measured it is inconsistent with the
+  !! data, so it is rejected. Only observed periods are ever tested, so a
+  !! model is never rejected for failing where there is no datum. Dropping
+  !! failed points instead would be WRONG: the number of data would then vary
+  !! between models and the likelihood would reward vanishing modes.
+  !!
+  IF(SUM(ivalidSWD(1:nswd_m)) < nswd_m)THEN
+    logL = -HUGE(1._RP)
+    RETURN
+  ENDIF
+
+  obj%DpredSWD(imode,1:nswd_m) = REAL(DpredSWD(1:nswd_m),RP)
+  obj%DresSWD(imode,1:nswd_m)  = obj%DobsSWD(imode,1:nswd_m)-obj%DpredSWD(imode,1:nswd_m)
+ENDDO
 
 ibadlogL = 0
 IF(IAR == 1)THEN
@@ -1381,7 +1389,9 @@ IF(IAR == 1)THEN
   !!
   !!  Compute autoregressive model
   !!
-  CALL ARPRED_SWD(obj,1,1,NDAT_SWD)
+  DO imode = 1,NMODE
+    IF(NDAT_MODE(imode) > 0) CALL ARPRED_SWD(obj,imode,1,NDAT_MODE(imode))
+  ENDDO
   !! Recompute predicted data as ith autoregressive model
   obj%DresSWD = obj%DresSWD-obj%DarSWD
 
@@ -1399,7 +1409,7 @@ IF(ibadlogL == 0)THEN
   !! implicitly sample over sigma
   !!
   DO imod = 1,NMODE
-    EtmpSWD(imod) = -REAL(NDAT_SWD,RP)/2._RP * LOG( SUM(obj%DresSWD(imod,:)**2._RP) / REAL(NDAT_SWD,RP) )
+    EtmpSWD(imod) = -REAL(NDAT_MODE(imod),RP)/2._RP * LOG( SUM(obj%DresSWD(imod,1:NDAT_MODE(imod))**2._RP) / REAL(NDAT_MODE(imod),RP) )
   ENDDO
   ELSEIF(ICOV_SWD == 1)THEN
     !!
@@ -1407,35 +1417,35 @@ IF(ibadlogL == 0)THEN
     !!
     IF (IMAGSCALE==0) THEN
       DO imod = 1,NMODE
-        EtmpSWD(imod) = LOG(1._RP/(2._RP*PI2)**(REAL(NDAT_SWD,RP)/2._RP)) &
-                      -(SUM(obj%DresSWD(imod,:)**2._RP)/(2._RP*obj%sdparSWD(imod)**2._RP)&
-                      +REAL(NDAT_SWD,RP)*LOG(obj%sdparSWD(imod)))
+        EtmpSWD(imod) = LOG(1._RP/(2._RP*PI2)**(REAL(NDAT_MODE(imod),RP)/2._RP)) &
+                      -(SUM(obj%DresSWD(imod,1:NDAT_MODE(imod))**2._RP)/(2._RP*obj%sdparSWD(imod)**2._RP)&
+                      +REAL(NDAT_MODE(imod),RP)*LOG(obj%sdparSWD(imod)))
       ENDDO
     ELSE !!IMAGSCALE
       DO imod = 1,NMODE
-        EtmpSWD(imod) = -(REAL(NDAT_SWD,RP)/2._RP)*LOG(2._RP*PI2) &
-                        -SUM(obj%DresSWD(imod,:)**2._RP/ &
-                            (2._RP*(obj%DobsSWD(imod,:)*obj%sdparSWD(imod))**2._RP)) &
-                        -REAL(NDAT_SWD,RP)*LOG(obj%sdparSWD(imod)) - &
-                         SUM(LOG(ABS(obj%DobsSWD(imod,:))))
+        EtmpSWD(imod) = -(REAL(NDAT_MODE(imod),RP)/2._RP)*LOG(2._RP*PI2) &
+                        -SUM(obj%DresSWD(imod,1:NDAT_MODE(imod))**2._RP/ &
+                            (2._RP*(obj%DobsSWD(imod,1:NDAT_MODE(imod))*obj%sdparSWD(imod))**2._RP)) &
+                        -REAL(NDAT_MODE(imod),RP)*LOG(obj%sdparSWD(imod)) - &
+                         SUM(LOG(ABS(obj%DobsSWD(imod,1:NDAT_MODE(imod)))))
       END DO
     END IF !!IMAGSCALE
   ELSEIF(ICOV_SWD == 2)THEN
     !! Empirical cov mat estimate and magnitude scaling (scaling is done via std
     !! dev parameter... (see Dettmer et al. 2014 GJI)  scaling: Cd = sC'd not Cd = (s^2)C'd 
     DO imod = 1,NMODE
-      EtmpSWD(imod) = -DOT_PRODUCT(MATMUL(obj%DresSWD(imod,:),CdiSWD),obj%DresSWD(imod,:)) !TRANSPOSE(obj%DresSWD(imod,:)))
+      EtmpSWD(imod) = -DOT_PRODUCT(MATMUL(obj%DresSWD(imod,1:NDAT_MODE(imod)),CdiSWD(1:NDAT_MODE(imod),1:NDAT_MODE(imod))),obj%DresSWD(imod,1:NDAT_MODE(imod))) !TRANSPOSE(obj%DresSWD(imod,1:NDAT_MODE(imod))))
       EtmpSWD(imod) = EtmpSWD(imod)/(2._RP*obj%sdparSWD(imod)) &
-           -REAL(NDAT_SWD,RP)/2._RP*LOG(obj%sdparSWD(imod))
-       !EtmpSWD(imod) = LOG(1._RP/(2._RP*PI2)**(REAL(NDAT_SWD,RP)/2._RP)) &
-       !              -(SUM(obj%DresSWD(imod,:)**2._RP)/(2._RP*obj%sdparSWD(imod)**2._RP)&
-       !              +REAL(NDAT_SWD,RP)*LOG(obj%sdparSWD(imod)))
+           -REAL(NDAT_MODE(imod),RP)/2._RP*LOG(obj%sdparSWD(imod))
+       !EtmpSWD(imod) = LOG(1._RP/(2._RP*PI2)**(REAL(NDAT_MODE(imod),RP)/2._RP)) &
+       !              -(SUM(obj%DresSWD(imod,1:NDAT_MODE(imod))**2._RP)/(2._RP*obj%sdparSWD(imod)**2._RP)&
+       !              +REAL(NDAT_MODE(imod),RP)*LOG(obj%sdparSWD(imod)))
     ENDDO
   ELSEIF(ICOV_SWD ==3)THEN
     DO imod = 1,NMODE
-      EtmpSWD(imod) = -REAL(NDAT_SWD,RP)/2._RP*LOG(2._RP*PI2) &
-                      -REAL(NDAT_SWD,RP)*LOG(obj%sdparSWD(imod)) - SUM(LOG(sdSWD(imod,:))) &
-                      -SUM((obj%DresSWD(imod,:)/sdSWD(imod,:))**2)/(2._RP*obj%sdparSWD(imod)**2)
+      EtmpSWD(imod) = -REAL(NDAT_MODE(imod),RP)/2._RP*LOG(2._RP*PI2) &
+                      -REAL(NDAT_MODE(imod),RP)*LOG(obj%sdparSWD(imod)) - SUM(LOG(sdSWD(imod,1:NDAT_MODE(imod)))) &
+                      -SUM((obj%DresSWD(imod,1:NDAT_MODE(imod))/sdSWD(imod,1:NDAT_MODE(imod)))**2)/(2._RP*obj%sdparSWD(imod)**2)
     END DO
   ENDIF
   logL = SUM(EtmpSWD)

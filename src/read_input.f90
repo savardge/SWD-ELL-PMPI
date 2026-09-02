@@ -8,6 +8,9 @@ USE RAY3D_COM
 IMPLICIT NONE
 INTEGER(KIND=RP):: ntmp,iaz,ik,ilim
 REAL(KIND=RP)   :: vref, dVs, VpVsmin, VpVsmax, dVpVs
+CHARACTER(LEN=256) :: kwline
+CHARACTER(LEN=32)  :: kw
+INTEGER(KIND=IB)   :: io_kw,ipos,ic_kw,ntmp2
 INTERFACE
    FUNCTION LOGFACTORIAL(n)
      USE DATA_TYPE
@@ -100,6 +103,69 @@ READ(20,*) COUNT_ELL  !!76
 READ(20,*) I_SET_RANGE_ELL !!77
 !READ(20,*) VpVsmin   !! minimum VpVs ratio
 !READ(20,*) VpVsmax   !! maximum VpVs ratio
+!!
+!! ---- OPTIONAL KEYWORD LINES (multimode-raydsp branch) ----
+!! Any line after the 77 positional ones of the form  KEYWORD value(s)  is
+!! parsed; everything else (blank, comments, leftover legacy lines) is ignored,
+!! so every pre-existing parameter file keeps working unchanged.
+!!   DVSCON  x            max |adjacent-layer dVs| in km/s, indicator prior
+!!                        checked before the forward (Kennett 2023/2026;
+!!                        BayHunter lvz/hvz parity). Absent or < 0 = off.
+!!   MODE_OF m1 m2 ...    Rayleigh mode number of each SWD curve slot (NMODE
+!!                        ascending integers >= 0). Slot files are named by
+!!                        mode: <base>_SWD.dat (mode 0), <base>_SWD_M<m>.dat.
+!!                        Absent = 0 1 ... NMODE-1.  E.g. "MODE_OF 0 2" fits
+!!                        the fundamental + second higher mode with no R1.
+!!   IGRP    0|1          0 = phase velocity (default), 1 = group velocity.
+!!   SWD_SCAN cmin cmax dc  DISPER80 root-scan window and step in km/s.
+!!                        Default 2.0 6.5 0.05 (crustal). Near-surface work
+!!                        needs e.g. 0.08 1.6 0.005. Overtones scan at dc/5.
+!!
+ALLOCATE( MODE_OF(NMODE) )
+DO ntmp2 = 1,NMODE
+  MODE_OF(ntmp2) = ntmp2-1
+ENDDO
+DO
+  READ(20,'(A)',IOSTAT=io_kw) kwline
+  IF(io_kw /= 0) EXIT
+  ipos = INDEX(kwline,'!')
+  IF(ipos > 0) kwline = kwline(1:ipos-1)
+  kwline = ADJUSTL(kwline)
+  IF(LEN_TRIM(kwline) == 0) CYCLE
+  ipos = INDEX(kwline,' ')
+  IF(ipos <= 1) CYCLE
+  kw = kwline(1:ipos-1)
+  DO ic_kw = 1,LEN_TRIM(kw)
+    IF(kw(ic_kw:ic_kw) >= 'a' .AND. kw(ic_kw:ic_kw) <= 'z') kw(ic_kw:ic_kw) = ACHAR(IACHAR(kw(ic_kw:ic_kw))-32)
+  ENDDO
+  SELECT CASE (TRIM(kw))
+  CASE ('DVSCON')
+    READ(kwline(ipos:),*,IOSTAT=io_kw) DVSCON
+  CASE ('MODE_OF')
+    READ(kwline(ipos:),*,IOSTAT=io_kw) MODE_OF
+    IF(io_kw /= 0)THEN
+      WRITE(6,*) 'ERROR: MODE_OF needs NMODE =',NMODE,' integers: ',TRIM(kwline)
+      STOP
+    ENDIF
+  CASE ('IGRP')
+    READ(kwline(ipos:),*,IOSTAT=io_kw) IGRP
+  CASE ('SWD_SCAN')
+    READ(kwline(ipos:),*,IOSTAT=io_kw) SWD_CMIN,SWD_CMAX,SWD_DC
+    IF(io_kw /= 0)THEN
+      WRITE(6,*) 'ERROR: SWD_SCAN needs cmin cmax dc: ',TRIM(kwline)
+      STOP
+    ENDIF
+  CASE DEFAULT
+    !! not a keyword (e.g. legacy trailing lines) - ignored
+  END SELECT
+  io_kw = 0
+ENDDO
+DO ntmp2 = 2,NMODE
+  IF(MODE_OF(ntmp2) <= MODE_OF(ntmp2-1) .OR. MODE_OF(1) < 0)THEN
+    WRITE(6,*) 'ERROR: MODE_OF must be ascending and >= 0:',MODE_OF
+    STOP
+  ENDIF
+ENDDO
 CLOSE(20)
 
 !! Allocate raysum oarameters
@@ -497,6 +563,11 @@ IMPLICIT NONE
   WRITE(6,*) 'pertsdsdscMT:'
   WRITE(6,203) pertsdsdscMT
   !WRITE(6,*) 'Done reading data.'
+  WRITE(6,*) '--- multimode SWD keywords ---'
+  WRITE(6,*) 'DVSCON     = ', DVSCON
+  WRITE(6,*) 'MODE_OF    = ', MODE_OF
+  WRITE(6,*) 'IGRP       = ', IGRP
+  WRITE(6,*) 'SWD_SCAN   = ', SWD_CMIN, SWD_CMAX, SWD_DC
   IF (icovIter==0_IB) WRITE(6,*) 'Done reading parameter file.'
   WRITE(6,*) ''
   WRITE(6,*) ' ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~  '
@@ -516,6 +587,9 @@ SUBROUTINE READDATA(obj)
 USE RJMCMC_COM
 IMPLICIT NONE
 INTEGER(KIND=RP):: iaz,idat,io
+INTEGER(KIND=IB):: imode,nswd_m
+CHARACTER(LEN=100) :: swdfile
+CHARACTER(LEN=8)   :: modestr
 TYPE(objstruc)  :: obj
 REAL(KIND=RP), DIMENSION(NDAT_MT) :: CdiMT_R, CdiMT_I
 
@@ -573,20 +647,51 @@ IF(I_SWD == 1)THEN
   !!
   !! Surface wave dispersion data:
   !!
-  OPEN(20,FILE=infileSWD,FORM='formatted',STATUS='OLD',ACTION='READ')
-  !ndat = 0
-  DO idat=1,NDAT_SWD
-     READ(20,*,IOSTAT=io) obj%periods(1,idat),obj%DobsSWD(1,idat)
-     IF (io > 0) THEN
-       STOP "Check input.  Something was wrong"
-     ELSEIF (io < 0) THEN
-       EXIT
-     ELSE
-     !  ndatad=ndatad+1
-     ENDIF
-     !if (i==ndatadmax) stop "number of Dispersion data >= ndatadmax"
+  !!
+  !! One file per curve slot, named by its Rayleigh MODE number (MODE_OF):
+  !!   mode 0 -> <base>_SWD.dat, mode m -> <base>_SWD_M<m>.dat
+  !! Each is read to EOF; the count goes into NDAT_MODE, so curves may have
+  !! different numbers of points on different frequency grids (NDAT_SWD is
+  !! only the array width).
+  !!
+  IF(.NOT.ALLOCATED(NDAT_MODE)) ALLOCATE( NDAT_MODE(NMODE) )
+  NDAT_MODE = 0
+  obj%periods = 0._RP
+  obj%DobsSWD = 0._RP
+  DO imode = 1,NMODE
+    IF(MODE_OF(imode) == 0)THEN
+      swdfile = infileSWD
+    ELSE
+      WRITE(modestr,'(I0)') MODE_OF(imode)
+      swdfile = filebase(1:filebaselen) // '_SWD_M' // TRIM(modestr) // '.dat'
+    ENDIF
+    OPEN(20,FILE=swdfile,FORM='formatted',STATUS='OLD',ACTION='READ',IOSTAT=io)
+    IF(io /= 0)THEN
+      WRITE(6,*) 'ERROR: cannot open SWD data file for mode ',MODE_OF(imode),': ',TRIM(swdfile)
+      STOP
+    ENDIF
+    nswd_m = 0
+    DO idat=1,NDAT_SWD
+       READ(20,*,IOSTAT=io) obj%periods(imode,idat),obj%DobsSWD(imode,idat)
+       IF (io > 0) THEN
+         STOP "Check input.  Something was wrong"
+       ELSEIF (io < 0) THEN
+         EXIT
+       ELSE
+         nswd_m = nswd_m + 1
+       ENDIF
+    ENDDO
+    CLOSE(20)
+    IF(nswd_m == 0)THEN
+      WRITE(6,*) 'ERROR: no data read for SWD mode ',MODE_OF(imode),' from ',TRIM(swdfile)
+      STOP
+    ENDIF
+    NDAT_MODE(imode) = nswd_m
+    WRITE(6,*) 'SWD mode ',MODE_OF(imode),':',nswd_m,' points from ',TRIM(swdfile)
+    IF(nswd_m == NDAT_SWD)THEN
+      WRITE(6,*) '  NOTE: hit NDAT_SWD; increase it if this file has more rows.'
+    ENDIF
   ENDDO
-  CLOSE(20)! close the file
   IF(ICOV_SWD == 2)THEN
     !! SWD case, read CdSWD^-1 from file:
     OPEN(UNIT=30,FILE=infileCdiSWD,FORM='formatted',STATUS='OLD',ACTION='READ')

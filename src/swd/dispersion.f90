@@ -1,4 +1,4 @@
-subroutine dispersion(nlyrs,rho,alpha,beta,thick,c,peri,NTMAX,ier)
+subroutine dispersion(nlyrs,rho,alpha,beta,thick,vel,peri,NTMAX,IGRP,ier,nmode_in,ivalid,cmin_in,cmax_in,dc_in)
 ! C ----------------------------------------------------------------------
 ! C Hrvoje Tkalcic, February 25, 2005, LLNL
 ! C The only input file is model.0              
@@ -23,17 +23,33 @@ subroutine dispersion(nlyrs,rho,alpha,beta,thick,c,peri,NTMAX,ier)
       REAL      alpha(nlyrs), beta(nlyrs),rho(nlyrs),&
                thick(nlyrs), smooth(nlyrs), beta_ap(nlyrs),&
                weight(nlyrs), cmin, cmax,& 
-               dc, tol, pi2, w, ax(nlyrs), c(NTMAX), u(NTMAX), ekd, y0l(6),&
+               dc, tol, pi2, w, ax(nlyrs), c(NTMAX), u(NTMAX), &
+               vel(NTMAX), ekd, y0l(6),&
                vp(2*nlyrs), vs(2*nlyrs), z(2*nlyrs), za,&
                y0r(3), yij(15), ap(nlyrs), ae(nlyrs), peri (NTMAX)
       CHARACTER*20 title
 !C
       EXTERNAL  lovmrx, raymrx
+!! Mode index: 0 = fundamental (= original DISPER80 behaviour), 1 = first
+!! higher mode, ... Resolved by RAYDSPN's sign-change counting. REQUIRED, not
+!! optional: dispersion() is a bare external subroutine with no explicit
+!! interface at its call site, and OPTIONAL/PRESENT is invalid without one.
+      INTEGER, INTENT(IN) :: nmode_in
+!! Per-period validity: 1 = root found, 0 = not found (mode below cut-off, or
+!! leaky i.e. c > half-space Vs, which DISPER80 legitimately refuses).
+!! NEEDED because ier below is overwritten on every period, so on its own it
+!! only ever reports the status of the LAST period - a latent bug that becomes
+!! important for overtones, which routinely fail near their cut-off.
+      INTEGER, INTENT(OUT) :: ivalid(NTMAX)
+!! Root-scan window and step [km/s] (keyword SWD_SCAN in the parameter file;
+!! defaults 2.0 6.5 0.05 = the original crustal values; near-surface work
+!! needs e.g. 0.08 1.6 0.005).
+      REAL, INTENT(IN) :: cmin_in, cmax_in, dc_in
 !C
       DATA      pi2/6.283185/, ia/0/
-      cmin=2.0
-      cmax=6.5
-      dc=0.05 
+      cmin=cmin_in
+      cmax=cmax_in
+      dc=dc_in
       tol=0.0001
       itr=10
 ! CCCCCCCCCCCCCCCCCCCCCCCC
@@ -64,6 +80,15 @@ DO ilay=1,nlyrs
 ENDDO
 
 !!write (*,*)alpha,beta,rho,thick
+
+!! Overtones need a finer scan: R1/R2 approach to ~12 m/s near 15.5 Hz on the
+!! HVC dam model, i.e. 2 steps at dc=0.005. At dc=0.001 mode-2 agreement with
+!! disba improves from 1.59 to 0.01 m/s. The fundamental is unaffected
+!! (identical to 0.00 m/s at either step), so keep it cheap.
+IF (nmode_in > 0) dc = dc_in/5.
+
+ivalid = 0
+
 DO iper=1,NTMAX
   w=pi2/peri(iper)
 ! CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
@@ -92,13 +117,37 @@ DO iper=1,NTMAX
   !write (*,*) 'y0r',y0r
   !write (*,*) 'yij',yij
 
-  CALL raydsp (raymrx,thick,rho,alpha,beta,ap,ae,nlyrs,&
-               w,cmin,cmax,dc,tol,itr,ia,c(iper),u(iper),&
+  c(iper) = 0.
+  u(iper) = 0.
+  CALL raydspn(raymrx,thick,rho,alpha,beta,ap,ae,nlyrs,&
+               w,cmin,cmax,dc,tol,itr,ia,nmode_in,c(iper),u(iper),&
                ekd,y0r,yij,ier)
+  IF(ier < 0)THEN
+    !! Hard input error: abort the whole call (ier propagates to the caller).
+    ivalid(iper:NTMAX) = 0
+    vel = 0.
+    RETURN
+  ENDIF
+  !! ier = 1 (slow convergence) and 2 (root not found) both mean "no usable
+  !! datum here"; this matches the original all-or-nothing treatment of ier/=0,
+  !! but now resolved PER PERIOD instead of for the whole curve.
+  IF(ier == 0)THEN
+    ivalid(iper) = 1
+  ELSE
+    ivalid(iper) = 0
+  ENDIF
   !write (*,*) w,u(iper),c(iper)
   !write(*,*)'------------------------'
 ENDDO
 !write (*,*) 'c',c
 !write (*,*) 'u',u
+!! JD
+!! Select either group (u) or phase (c) velocity
+ier = 0
+IF(IGRP == 1)THEN
+  vel = u
+ELSE
+  vel = c
+ENDIF
 RETURN
 END SUBROUTINE
