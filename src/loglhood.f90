@@ -1261,6 +1261,7 @@ REAL(KIND=SP),DIMENSION(maxlay+NPREM,10):: curmod2
 REAL(KIND=SP),DIMENSION(NDAT_SWD)     :: periods,DpredSWD
 INTEGER(KIND=IB),DIMENSION(NDAT_SWD)  :: ivalidSWD
 INTEGER(KIND=IB)                      :: imode,nswd_m
+REAL(KIND=RP)                         :: dc_over
 REAL(KIND=RP),DIMENSION(NMODE)        :: EtmpSWD
 REAL(KIND=RP)                         :: logL,factvs,factvpvs
 REAL(KIND=RP)                         :: tstart, tend, tcmp   ! Overall time 
@@ -1346,6 +1347,8 @@ ENDIF
 !! Forward-model every curve slot on its OWN period grid and point count, as
 !! the Rayleigh mode MODE_OF(imode) (0 = fundamental; RAYDSPN counts roots).
 !!
+dc_over = SWD_DC_OVER
+IF(dc_over <= 0._RP) dc_over = SWD_DC/5._RP
 DO imode = 1,NMODE
   nswd_m = NDAT_MODE(imode)
   IF(nswd_m <= 0) CYCLE
@@ -1359,7 +1362,7 @@ DO imode = 1,NMODE
        curmod2(1:obj%nunique+1+NPREM,3)/1000.,curmod2(1:obj%nunique+1+NPREM,4)/1000.,&
        curmod2(1:obj%nunique+1+NPREM,1)/1000.,DpredSWD,&
        periods,nswd_m,IGRP,ierr_swd,MODE_OF(imode),ivalidSWD,&
-       REAL(SWD_CMIN,SP),REAL(SWD_CMAX,SP),REAL(SWD_DC,SP))
+       REAL(SWD_CMIN,SP),REAL(SWD_CMAX,SP),REAL(SWD_DC,SP),REAL(dc_over,SP))
 
   IF(ierr_swd < 0)THEN
     !! Hard input error in the propagator: reject.

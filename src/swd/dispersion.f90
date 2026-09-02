@@ -1,4 +1,4 @@
-subroutine dispersion(nlyrs,rho,alpha,beta,thick,vel,peri,NTMAX,IGRP,ier,nmode_in,ivalid,cmin_in,cmax_in,dc_in)
+subroutine dispersion(nlyrs,rho,alpha,beta,thick,vel,peri,NTMAX,IGRP,ier,nmode_in,ivalid,cmin_in,cmax_in,dc_in,dc_over_in)
 ! C ----------------------------------------------------------------------
 ! C Hrvoje Tkalcic, February 25, 2005, LLNL
 ! C The only input file is model.0              
@@ -44,7 +44,7 @@ subroutine dispersion(nlyrs,rho,alpha,beta,thick,vel,peri,NTMAX,IGRP,ier,nmode_i
 !! Root-scan window and step [km/s] (keyword SWD_SCAN in the parameter file;
 !! defaults 2.0 6.5 0.05 = the original crustal values; near-surface work
 !! needs e.g. 0.08 1.6 0.005).
-      REAL, INTENT(IN) :: cmin_in, cmax_in, dc_in
+      REAL, INTENT(IN) :: cmin_in, cmax_in, dc_in, dc_over_in
 !C
       DATA      pi2/6.283185/, ia/0/
       cmin=cmin_in
@@ -85,7 +85,7 @@ ENDDO
 !! HVC dam model, i.e. 2 steps at dc=0.005. At dc=0.001 mode-2 agreement with
 !! disba improves from 1.59 to 0.01 m/s. The fundamental is unaffected
 !! (identical to 0.00 m/s at either step), so keep it cheap.
-IF (nmode_in > 0) dc = dc_in/5.
+IF (nmode_in > 0) dc = dc_over_in
 
 ivalid = 0
 

@@ -56,7 +56,8 @@ MODULE RJMCMC_COM
    INTEGER(KIND=IB) :: IGRP     = 0        !! 1 = group velocity, 0 = phase velocity (keyword IGRP)
    REAL(KIND=RP)    :: SWD_CMIN = 2.0_RP   !! DISPER80 phase-speed scan window [km/s] (keyword SWD_SCAN cmin cmax dc)
    REAL(KIND=RP)    :: SWD_CMAX = 6.5_RP   !!   defaults = the original crustal values of dispersion.f90
-   REAL(KIND=RP)    :: SWD_DC   = 0.05_RP  !!   scan step [km/s]; overtones use dc/5
+   REAL(KIND=RP)    :: SWD_DC   = 0.05_RP  !!   scan step [km/s] for the fundamental
+   REAL(KIND=RP)    :: SWD_DC_OVER = -1._RP !!   scan step for overtones (optional 4th SWD_SCAN value; < 0 = dc/5)
    INTEGER(KIND=IB)            :: NTIME        ! Number time samples
    INTEGER(KIND=IB)            :: NSRC         ! Number time samples in source-time function
    INTEGER(KIND=IB)            :: NTIME2       ! Number time samples for zero padded observations

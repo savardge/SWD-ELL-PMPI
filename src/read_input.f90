@@ -117,9 +117,11 @@ READ(20,*) I_SET_RANGE_ELL !!77
 !!                        Absent = 0 1 ... NMODE-1.  E.g. "MODE_OF 0 2" fits
 !!                        the fundamental + second higher mode with no R1.
 !!   IGRP    0|1          0 = phase velocity (default), 1 = group velocity.
-!!   SWD_SCAN cmin cmax dc  DISPER80 root-scan window and step in km/s.
-!!                        Default 2.0 6.5 0.05 (crustal). Near-surface work
-!!                        needs e.g. 0.08 1.6 0.005. Overtones scan at dc/5.
+!!   SWD_SCAN cmin cmax dc [dc_over]  DISPER80 root-scan window and step in
+!!                        km/s. Default 2.0 6.5 0.05 (crustal); near-surface
+!!                        work needs e.g. 0.08 1.6 0.005. Overtones scan at
+!!                        dc_over (default dc/5; give it explicitly, e.g.
+!!                        0.001, for bit-reproducible runs across builds).
 !!
 ALLOCATE( MODE_OF(NMODE) )
 DO ntmp2 = 1,NMODE
@@ -150,10 +152,14 @@ DO
   CASE ('IGRP')
     READ(kwline(ipos:),*,IOSTAT=io_kw) IGRP
   CASE ('SWD_SCAN')
-    READ(kwline(ipos:),*,IOSTAT=io_kw) SWD_CMIN,SWD_CMAX,SWD_DC
-    IF(io_kw /= 0)THEN
-      WRITE(6,*) 'ERROR: SWD_SCAN needs cmin cmax dc: ',TRIM(kwline)
+    READ(kwline(ipos:),*,IOSTAT=io_kw) SWD_CMIN,SWD_CMAX,SWD_DC,SWD_DC_OVER
+    IF(io_kw > 0)THEN
+      WRITE(6,*) 'ERROR: SWD_SCAN needs cmin cmax dc [dc_overtones]: ',TRIM(kwline)
       STOP
+    ENDIF
+    IF(io_kw < 0)THEN   !! only three values given: overtone step defaults to dc/5
+      READ(kwline(ipos:),*,IOSTAT=io_kw) SWD_CMIN,SWD_CMAX,SWD_DC
+      SWD_DC_OVER = -1._RP
     ENDIF
   CASE DEFAULT
     !! not a keyword (e.g. legacy trailing lines) - ignored
@@ -567,7 +573,7 @@ IMPLICIT NONE
   WRITE(6,*) 'DVSCON     = ', DVSCON
   WRITE(6,*) 'MODE_OF    = ', MODE_OF
   WRITE(6,*) 'IGRP       = ', IGRP
-  WRITE(6,*) 'SWD_SCAN   = ', SWD_CMIN, SWD_CMAX, SWD_DC
+  WRITE(6,*) 'SWD_SCAN   = ', SWD_CMIN, SWD_CMAX, SWD_DC, SWD_DC_OVER
   IF (icovIter==0_IB) WRITE(6,*) 'Done reading parameter file.'
   WRITE(6,*) ''
   WRITE(6,*) ' ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~  '
