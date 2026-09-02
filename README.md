@@ -9,7 +9,7 @@ optional **adjacent-layer contrast constraint**.
 Repository: [savardge/SWD-ELL-PMPI](https://github.com/savardge/SWD-ELL-PMPI)
 (renamed from RF-SWD-ELL-MT-PMPI), a fork of
 [pejman-sh86/RF-SWD-ELL-MT-PMPI](https://github.com/pejman-sh86/RF-SWD-ELL-MT-PMPI)
-(Jan Dettmer's rjMcMC code line). Branch `multimode-raydsp`:
+(Jan Dettmer's rjMcMC code line). Relative to that upstream (all on `main`):
 
 - the receiver-function (RF) and magnetotelluric (MT) machinery has been
   **removed** (raysum/ray3d forward codes, MT1D forward, their data paths,
