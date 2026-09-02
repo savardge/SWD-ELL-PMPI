@@ -1,0 +1,13 @@
+# build products (compiled objects, modules, archives, binaries)
+*.o
+*.mod
+*.a
+*.so
+src/bin/
+src/obj/
+src/postpred
+src/postlog
+src/replica
+# run outputs
+*_voro_sample.txt
+*_run.log
