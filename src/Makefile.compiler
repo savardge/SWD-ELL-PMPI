@@ -1,9 +1,13 @@
-PASH= $(NVCOMPILERS)/Linux_x86_64/22.5/compilers/lib #PATH TO SHARED LIBRARIES
-#FC      = mpif90 -C -L$(PASH) -llapack -lblas -fast -O4 -fastsse
-#FCSERIAL= pgfortran -C -L$(PASH) -llapack -lblas -fast -O4 -fastsse
-#FCSWD = pgfortran -C -fast -O4 -fastsse
-#FCRS = pgfortran -C -fast -O4 -fastsse
-FC      = mpifort -C -L$(PASH) -llapack -lblas
-FCSERIAL= mpifort -C -L$(PASH) -llapack -lblas
-FCSWD = mpifort -C
-FCRS = mpifort -C
+## gfortran + Open MPI build (macOS arm64 / Linux). The original NVIDIA HPC SDK
+## version is kept as Makefile.compiler.nvhpc.
+## -fallow-argument-mismatch : MPI calls with varying buffer types
+## -std=legacy               : F77 sources in raysum/ and swd/ (DISPER80, EISPACK)
+## -fdec-format-defaults     : bare-I FORMAT descriptors (loglhood.f90, prjmh_temper_rf.f90)
+## -fno-realloc-lhs          : never re-allocate on assignment (objstruc components are
+##                             addressed by absolute MPI struct offsets; see COPY_OBJ)
+## -fcheck=bounds -g         : cheap insurance; drop for a ~20% faster production build
+FFLAGS_COMMON = -O2 -fallow-argument-mismatch -std=legacy -fdec-format-defaults -w -fno-realloc-lhs -g -fcheck=bounds
+FC      = mpif90 $(FFLAGS_COMMON)
+FCSERIAL= gfortran $(FFLAGS_COMMON)
+FCSWD   = gfortran $(FFLAGS_COMMON)
+FCRS    = gfortran $(FFLAGS_COMMON)

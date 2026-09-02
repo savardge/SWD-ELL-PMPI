@@ -24,7 +24,7 @@ OBJSR= ray3d/ray3d.o ray3d/ray3d_com.o ray3d/ray3d_par.o ray3d/theo.o ray3d/qlay
        $(OBJ)/pythag.o $(OBJ)/replica.o $(OBJ)/UPDATE_MAPfile.o  $(OBJ)/xcorr.o $(OBJ)/Zxcorr.o \
        $(OBJ)/COVmatEst.o  $(OBJ)/ZCOVmatEst.o $(OBJ)/UpdateCOV.o $(OBJ)/MT1DforwardB3.o
 FO = $(OBJ)/libraysum.a $(OBJ)/libswd.a
-LIB =
+LIB = -framework Accelerate   # LAPACK/BLAS for DPOTRF/ZPOTRF (COVmatEst); use -llapack -lblas on Linux
 ##############################################################################
 
 all: bin/prjmh_temper_rf
@@ -66,11 +66,11 @@ $(OBJ)/data_type.o: data_type.f90; $(FCSERIAL) -c data_type.f90 -o $(OBJ)/data_t
 	/bin/cp data_type.mod ./ray3d/
 
 ray3d/ray3d_com.o: ray3d/ray3d_com.f90 ray3d/ray3d_par.o $(OBJ)/data_type.o
-	(cd ./ray3d/;$(FCSERIAL) -c ray3d_com.f90 -o ray3d_com.o $(OBJ)/data_type.o ray3d_par.o $(LIB);)
+	(cd ./ray3d/;$(FCSERIAL) -c ray3d_com.f90 -o ray3d_com.o $(LIB);)
 	/bin/cp ./ray3d/ray3d_com.mod .
 
 ray3d/ray3d_par.o: ray3d/ray3d_par.f90 $(OBJ)/data_type.o
-	(cd ./ray3d/;$(FCSERIAL) -c ray3d_par.f90 -o ray3d_par.o $(OBJ)/data_type.o $(LIB);)
+	(cd ./ray3d/;$(FCSERIAL) -c ray3d_par.f90 -o ray3d_par.o $(LIB);)
 	/bin/cp ./ray3d/ray3d_par.mod .
 
 ##############################################################################

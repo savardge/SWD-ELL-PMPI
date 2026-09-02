@@ -780,7 +780,7 @@ INTEGER(KIND=IB),DIMENSION(NLMX) :: idxpick
 REAL(KIND=RP)                    :: logarp
 INTEGER(KIND=IB)                 :: arptype,choose
 
-objnew1 = obj
+CALL COPY_OBJ(objnew1,obj)
 !!
 !! Do Metropolis-Hastings on data-error standard deviations
 !!
@@ -802,14 +802,14 @@ IF(ICOV >= 1)THEN
         logPLratio = (objnew1%logL - obj%logL)*beta_mh
         CALL RANDOM_NUMBER(ran_uni)
         IF(ran_uni >= EXP(logPLratio))THEN
-          objnew1 = obj
+          CALL COPY_OBJ(objnew1,obj)
           ireject = ireject + 1
         ELSE
-          obj = objnew1
+          CALL COPY_OBJ(obj,objnew1)
           iaccept = iaccept + 1
         ENDIF
       ELSE
-        objnew1 = obj
+        CALL COPY_OBJ(objnew1,obj)
         ireject = ireject + 1
         ioutside = 0
       ENDIF
@@ -823,14 +823,14 @@ IF(ICOV >= 1)THEN
           logPLratio = (objnew1%logL - obj%logL)*beta_mh
           CALL RANDOM_NUMBER(ran_uni)
           IF(ran_uni >= EXP(logPLratio))THEN
-            objnew1 = obj
+            CALL COPY_OBJ(objnew1,obj)
             ireject = ireject + 1
           ELSE
-            obj = objnew1
+            CALL COPY_OBJ(obj,objnew1)
             iaccept = iaccept + 1
           ENDIF
         ELSE
-          objnew1 = obj
+          CALL COPY_OBJ(objnew1,obj)
           ireject = ireject + 1
           ioutside = 0
         ENDIF
@@ -845,14 +845,14 @@ IF(ICOV >= 1)THEN
           logPLratio = (objnew1%logL - obj%logL)*beta_mh
           CALL RANDOM_NUMBER(ran_uni)
           IF(ran_uni >= EXP(logPLratio))THEN
-            objnew1 = obj
+            CALL COPY_OBJ(objnew1,obj)
             ireject = ireject + 1
           ELSE
-            obj = objnew1
+            CALL COPY_OBJ(obj,objnew1)
             iaccept = iaccept + 1
           ENDIF
         ELSE
-          objnew1 = obj
+          CALL COPY_OBJ(objnew1,obj)
           ireject = ireject + 1
           ioutside = 0
         ENDIF
@@ -879,14 +879,14 @@ IF(ICOV_SWD >= 1) THEN
         logPLratio = (objnew1%logL - obj%logL)*beta_mh
         CALL RANDOM_NUMBER(ran_uni)
         IF(ran_uni >= EXP(logPLratio))THEN
-          objnew1 = obj
+          CALL COPY_OBJ(objnew1,obj)
           ireject = ireject + 1
         ELSE
-          obj = objnew1
+          CALL COPY_OBJ(obj,objnew1)
           iaccept = iaccept + 1
         ENDIF
       ELSE
-        objnew1 = obj
+        CALL COPY_OBJ(objnew1,obj)
         ireject = ireject + 1
         ioutside = 0
       ENDIF
@@ -912,14 +912,14 @@ IF (ICOV_ELL >= 1) THEN
         logPLratio = (objnew1%logL - obj%logL)*beta_mh
         CALL RANDOM_NUMBER(ran_uni)
         IF(ran_uni >= EXP(logPLratio))THEN
-          objnew1 = obj
+          CALL COPY_OBJ(objnew1,obj)
           ireject = ireject + 1
         ELSE
-          obj = objnew1
+          CALL COPY_OBJ(obj,objnew1)
           iaccept = iaccept + 1
         ENDIF
       ELSE
-        objnew1 = obj
+        CALL COPY_OBJ(objnew1,obj)
         ireject = ireject + 1
         ioutside = 0
       ENDIF
@@ -944,14 +944,14 @@ IF(ICOV_MT >= 1) THEN
         logPLratio = (objnew1%logL - obj%logL)*beta_mh
         CALL RANDOM_NUMBER(ran_uni)
         IF(ran_uni >= EXP(logPLratio))THEN
-          objnew1 = obj
+          CALL COPY_OBJ(objnew1,obj)
           ireject = ireject + 1
         ELSE
-          obj = objnew1
+          CALL COPY_OBJ(obj,objnew1)
           iaccept = iaccept + 1
         ENDIF
       ELSE
-        objnew1 = obj
+        CALL COPY_OBJ(objnew1,obj)
         ireject = ireject + 1
         ioutside = 0
       ENDIF
@@ -1041,14 +1041,14 @@ IF(I_RV == -1)THEN
         logPLratio = logarp + (objnew1%logL - obj%logL)*beta_mh
         CALL RANDOM_NUMBER(ran_uni)
         IF(ran_uni >= EXP(logPLratio))THEN
-          objnew1 = obj
+          CALL COPY_OBJ(objnew1,obj)
           ireject = ireject + 1
         ELSE
-          obj = objnew1
+          CALL COPY_OBJ(obj,objnew1)
           iaccept = iaccept + 1
         ENDIF
       ELSE
-        objnew1 = obj
+        CALL COPY_OBJ(objnew1,obj)
         ireject = ireject + 1
         ioutside = 0
       ENDIF
@@ -1091,14 +1091,14 @@ IF(I_SWD == 1)THEN
         logPLratio = logarp + (objnew1%logL - obj%logL)*beta_mh
         CALL RANDOM_NUMBER(ran_uni)
         IF(ran_uni >= EXP(logPLratio))THEN
-          objnew1 = obj
+          CALL COPY_OBJ(objnew1,obj)
           ireject = ireject + 1
         ELSE
-          obj = objnew1
+          CALL COPY_OBJ(obj,objnew1)
           iaccept = iaccept + 1
         ENDIF
       ELSE
-        objnew1 = obj
+        CALL COPY_OBJ(objnew1,obj)
         ireject = ireject + 1
         ioutside = 0
       ENDIF
@@ -1141,14 +1141,14 @@ IF(I_ELL == 1)THEN
         logPLratio = logarp + (objnew1%logL - obj%logL)*beta_mh
         CALL RANDOM_NUMBER(ran_uni)
         IF(ran_uni >= EXP(logPLratio))THEN
-          objnew1 = obj
+          CALL COPY_OBJ(objnew1,obj)
           ireject = ireject + 1
         ELSE
-          obj = objnew1
+          CALL COPY_OBJ(obj,objnew1)
           iaccept = iaccept + 1
         ENDIF
       ELSE
-        objnew1 = obj
+        CALL COPY_OBJ(objnew1,obj)
         ireject = ireject + 1
         ioutside = 0
       ENDIF
@@ -1185,7 +1185,7 @@ INTEGER(KIND=IB),DIMENSION(NLMX) :: idxpick
 REAL(KIND=RP)                    :: logarp
 INTEGER(KIND=IB)                 :: arptype,choose
 
-objnew1 = obj
+CALL COPY_OBJ(objnew1,obj)
 !! Draw uniform Birth-Death probability
 CALL RANDOM_NUMBER(ran_uni_BD)
 i_bd = 0
@@ -1220,14 +1220,14 @@ IF(kmin /= kmax)THEN
 
       CALL RANDOM_NUMBER(ran_uni)
       IF(ran_uni >= EXP(logPLratio))THEN
-        objnew1 = obj
+        CALL COPY_OBJ(objnew1,obj)
         obj%ireject_bd = obj%ireject_bd + 1
       ELSE
-        obj = objnew1
+        CALL COPY_OBJ(obj,objnew1)
         obj%iaccept_bd = obj%iaccept_bd + 1
       ENDIF
     ELSE
-      objnew1 = obj
+      CALL COPY_OBJ(objnew1,obj)
       obj%ireject_bd = obj%ireject_bd + 1
       ioutside = 0
     ENDIF
@@ -1257,14 +1257,14 @@ DO ivo = 1,obj%k
         logPLratio = logPratio + (objnew1%logL - obj%logL)*beta_mh
         CALL RANDOM_NUMBER(ran_uni)
         IF(ran_uni >= EXP(logPLratio))THEN
-          objnew1 = obj
+          CALL COPY_OBJ(objnew1,obj)
           ireject = ireject + 1
         ELSE
-          obj = objnew1
+          CALL COPY_OBJ(obj,objnew1)
           iaccept = iaccept + 1
         ENDIF  !! MH if
       ELSE !! outside before delayed rejection
-        objnew1 = obj
+        CALL COPY_OBJ(objnew1,obj)
         ireject = ireject + 1
         ioutside = 0
       ENDIF !! ioutside if
@@ -1296,7 +1296,7 @@ INTEGER(KIND=IB),DIMENSION(NLMX) :: idxpick
 REAL(KIND=RP)                    :: logarp
 INTEGER(KIND=IB)                 :: arptype,choose
 
-objnew1 = obj
+CALL COPY_OBJ(objnew1,obj)
 !! Draw uniform Birth-Death probability
 CALL RANDOM_NUMBER(ran_uni_BD)
 i_bd = 0
@@ -1329,14 +1329,14 @@ IF(kmin /= kmax)THEN
 
       CALL RANDOM_NUMBER(ran_uni)
       IF(ran_uni >= EXP(logPLratio))THEN
-        objnew1 = obj
+        CALL COPY_OBJ(objnew1,obj)
         obj%ireject_bd = obj%ireject_bd + 1
       ELSE
-        obj = objnew1
+        CALL COPY_OBJ(obj,objnew1)
         obj%iaccept_bd = obj%iaccept_bd + 1
       ENDIF
     ELSE
-      objnew1 = obj
+      CALL COPY_OBJ(objnew1,obj)
       obj%ireject_bd = obj%ireject_bd + 1
       ioutside = 0
     ENDIF
@@ -1344,7 +1344,7 @@ IF(kmin /= kmax)THEN
 ENDIF
 IF(IBD_SINGLE == 1)THEN
 IF(obj%k > 1)THEN
-  objnew1 = obj
+  CALL COPY_OBJ(objnew1,obj)
   i_bds = 0
   !! Pick random node (except for first one):
   idxpick = 0
@@ -1374,14 +1374,14 @@ IF(obj%k > 1)THEN
 
     CALL RANDOM_NUMBER(ran_uni)
     IF(ran_uni >= EXP(logPLratio))THEN
-      objnew1 = obj
+      CALL COPY_OBJ(objnew1,obj)
       obj%ireject_bds = obj%ireject_bds + 1
     ELSE
-      obj = objnew1
+      CALL COPY_OBJ(obj,objnew1)
       obj%iaccept_bds = obj%iaccept_bds + 1
     ENDIF
   ELSE
-    objnew1 = obj
+    CALL COPY_OBJ(objnew1,obj)
     obj%ireject_bds = obj%ireject_bds + 1
     ioutside = 0
   ENDIF
@@ -1410,14 +1410,14 @@ DO ivo = 1,obj%k
         logPLratio = (objnew1%logL - obj%logL)*beta_mh
         CALL RANDOM_NUMBER(ran_uni)
         IF(ran_uni >= EXP(logPLratio))THEN
-          objnew1 = obj
+          CALL COPY_OBJ(objnew1,obj)
           ireject = ireject + 1
         ELSE
-          obj = objnew1
+          CALL COPY_OBJ(obj,objnew1)
           iaccept = iaccept + 1
         ENDIF  !! MH if
       ELSE !! outside before delayed rejection
-        objnew1 = obj
+        CALL COPY_OBJ(objnew1,obj)
         ireject = ireject + 1
         ioutside = 0
       ENDIF !! ioutside if
@@ -1444,7 +1444,7 @@ REAL(KIND=RP)                    :: ran_uni
 REAL(KIND=DRP),DIMENSION(NLMX,NPL):: tmpsort
 REAL(KIND=RP)                    :: zdel,zj,zjp1
 
-objnew = obj
+CALL COPY_OBJ(objnew,obj)
 objnew%k   = obj%k - 1
 objnew%NFP = (objnew%k * NPL) + (NPL-1)
 
@@ -1468,9 +1468,9 @@ ENDIF
 objnew%voro(idel,:) = 0._RP
 objnew%voroidx(idel,:) = 0
 tmpsort = 0._DRP
-tmpsort = REAL(objnew%voro(1:obj%k,:),DRP)
+tmpsort(1:obj%k,:) = REAL(objnew%voro(1:obj%k,:),DRP)
 CALL QSORTC2D(tmpsort(1:obj%k,:),objnew%voroidx(1:obj%k,:))
-objnew%voro(1:obj%k,:) = REAL(tmpsort,RP)
+objnew%voro(1:obj%k,:) = REAL(tmpsort(1:obj%k,:),RP)
 !CALL QSORTC2D(objnew%voro(1:obj%k,:),objnew%voroidx(1:obj%k,:))
 !! 4) Quicksort stores deleted array (all zeros) first.
 !!    Hence, move all one up unless deleted node is last node.
@@ -1526,7 +1526,7 @@ REAL(KIND=RP)                    :: znew,zj,zjp1
 INTEGER(KIND=IB),DIMENSION(NPL-1):: idxran
 INTEGER(KIND=IB),DIMENSION(NPL)  :: voroidx
 
-objnew = obj
+CALL COPY_OBJ(objnew,obj)
 objnew%k   = obj%k + 1
 objnew%NFP = (objnew%k * NPL) + (NPL-1)
 
@@ -1632,7 +1632,7 @@ INTEGER(KIND=IB),DIMENSION(NFPMX):: idxdeath
 REAL(KIND=RP)                    :: ran_uni
 REAL(KIND=DRP),DIMENSION(NLMX,NPL):: tmpsort
 
-objnew = obj
+CALL COPY_OBJ(objnew,obj)
 objnew%k   = obj%k - 1
 objnew%NFP = (objnew%k * NPL) + (NPL-1)
 
@@ -1650,9 +1650,9 @@ objnew%voro(idel,:) = 0._RP
 objnew%voroidx(idel,:) = 0
 
 tmpsort = 0._DRP
-tmpsort = REAL(objnew%voro(1:obj%k,:),DRP)
+tmpsort(1:obj%k,:) = REAL(objnew%voro(1:obj%k,:),DRP)
 CALL QSORTC2D(tmpsort(1:obj%k,:),objnew%voroidx(1:obj%k,:))
-objnew%voro(1:obj%k,:) = REAL(tmpsort,RP)
+objnew%voro(1:obj%k,:) = REAL(tmpsort(1:obj%k,:),RP)
 !CALL QSORTC2D(objnew%voro(1:obj%k,:),objnew%voroidx(1:obj%k,:))
 
 !! 4) Quicksort stores deleted array (all zeros) first.
@@ -1689,7 +1689,7 @@ REAL(KIND=RP),DIMENSION(obj%nunique):: ztmp
 INTEGER(KIND=IB),DIMENSION(NPL-1):: idxran
 INTEGER(KIND=IB),DIMENSION(NPL):: voroidx
 
-objnew = obj
+CALL COPY_OBJ(objnew,obj)
 objnew%k   = obj%k + 1
 objnew%NFP = (objnew%k * NPL) + (NPL-1)
 
@@ -1862,10 +1862,10 @@ IF(ran_uni1 <= EXP(logratio))THEN
 !    WRITE(ulog,204)'ic1:',ic1idx,obj(ic1idx)%k,logP1,obj(ic1idx)%logL,logratio,betaratio,EXP(logratio*betaratio),ran_uni2
 !    WRITE(ulog,204)'ic2:',ic2idx,obj(ic2idx)%k,logP2,obj(ic2idx)%logL
 !  ENDIF
-  objtmp1       = obj1
-  objtmp2       = obj2
-  obj1   = objtmp2
-  obj2   = objtmp1
+  CALL COPY_OBJ(objtmp1,obj1)
+  CALL COPY_OBJ(objtmp2,obj2)
+  CALL COPY_OBJ(obj1,objtmp2)
+  CALL COPY_OBJ(obj2,objtmp1)
   !! Temperature does not swap
   obj1%beta = objtmp1%beta
   obj2%beta = objtmp2%beta
@@ -1900,7 +1900,7 @@ TYPE(objstruc) :: obj,objnew,objtmp
 REAL(KIND=RP)  :: ran_uni, factor
 REAL(KIND=RP)                    :: zp,zj,zjp1,zjm1
 
-objnew = obj
+CALL COPY_OBJ(objnew,obj)
 objnew%logPr = 0._RP
 !!
 !! CAUCHY proposal
@@ -2341,9 +2341,12 @@ REAL(KIND=RP) :: ran_uni
 
 CALL RANDOM_SEED
 CALL RANDOM_SEED(SIZE=iseedsize)
-ALLOCATE( iseed1(iseedsize) )
+!! Allocate at least 34 so the fixed-seed constructor below fits without
+!! relying on realloc-on-assignment (build uses -fno-realloc-lhs).
+ALLOCATE( iseed1(MAX(iseedsize,34)) )
+iseed1 = 0
 IF(ISETSEED == 1)THEN
-   iseed1 = (/2303055,     2435432,     5604058,     4289794,     3472290, &
+   iseed1(1:34) = (/2303055,     2435432,     5604058,     4289794,     3472290, &
       7717070,      141180,     3783525,     3087889,     4812786,     3028075, &
       3712062,     6316731,      436800,     7957708,     2055697,     1944360, &
       1222992,     7537775,     7769874,     5588112,     7590383,     1426393, &
@@ -2467,7 +2470,7 @@ DO ic = 1,2
                            tmpvoro,objm(ic)%sdparR,objm(ic)%sdparV,objm(ic)%sdparT,objm(ic)%sdparSWD,objm(ic)%sdparELL,objm(ic)%sdparMT,  &
                            objm(ic)%arpar,objm(ic)%arparSWD,objm(ic)%arparELL, &
                            REAL(iaccept,RP)/REAL(iaccept+ireject,RP),REAL(objm(ic)%iaccept_bd,RP),&
-                           REAL(objm(ic)%ireject_bd,RP),REAL(objm(ic)%iaccept_bds,RP),REAL(ic,RP),REAL(rank,RP) /)
+                           REAL(objm(ic)%ireject_bd,RP),REAL(objm(ic)%iaccept_bds,RP),REAL(ic,RP),REAL(isource,RP) /)
     !!----------------------------------------------------------------------------------------
     IF (.NOT.cov_converged) THEN
     IF ( (ICOVest==2) .AND. (MOD(imcmc1,CHAINTHIN_COVest_period)==0) ) THEN
@@ -3010,3 +3013,87 @@ END SUBROUTINE DCONVT
 !=======================================================================
 ! This is the end my fiend...
 ! EOF
+
+!!=======================================================================
+SUBROUTINE COPY_OBJ(objdst,objsrc)
+!!=======================================================================
+!!
+!! Deep VALUE copy of an objstruc without deallocating/reallocating the
+!! destination's allocatable components. Fortran intrinsic derived-type
+!! assignment frees and re-mallocs every allocatable component (gfortran),
+!! which invalidates the ABSOLUTE addresses frozen into the MPI struct
+!! types built by MAKE_MPI_STRUC_SP -> heap use-after-free in MPI_SEND.
+!! All components have fixed shapes set by ALLOC_OBJ (unconditionally, for
+!! every data type), so value assignment is always conforming.
+!!
+USE DATA_TYPE
+USE RJMCMC_COM
+IMPLICIT NONE
+TYPE(objstruc) :: objdst,objsrc
+
+IF(.NOT.ALLOCATED(objdst%voro)) CALL ALLOC_OBJ(objdst)
+
+objdst%k           = objsrc%k
+objdst%nunique     = objsrc%nunique
+objdst%NFP         = objsrc%NFP
+objdst%beta        = objsrc%beta
+objdst%logL        = objsrc%logL
+objdst%logPr       = objsrc%logPr
+objdst%tcmp        = objsrc%tcmp
+objdst%ireject_bd  = objsrc%ireject_bd
+objdst%iaccept_bd  = objsrc%iaccept_bd
+objdst%ireject_bds = objsrc%ireject_bds
+objdst%iaccept_bds = objsrc%iaccept_bds
+objdst%voro        = objsrc%voro
+objdst%voroidx     = objsrc%voroidx
+objdst%par         = objsrc%par
+objdst%hiface      = objsrc%hiface
+objdst%ziface      = objsrc%ziface
+objdst%sdparR      = objsrc%sdparR
+objdst%sdparV      = objsrc%sdparV
+objdst%sdparT      = objsrc%sdparT
+objdst%sdparSWD    = objsrc%sdparSWD
+objdst%sdparELL    = objsrc%sdparELL
+objdst%sdparMT     = objsrc%sdparMT
+objdst%sdaveH      = objsrc%sdaveH
+objdst%sdaveV      = objsrc%sdaveV
+objdst%sdaveT      = objsrc%sdaveT
+objdst%sdaveSWD    = objsrc%sdaveSWD
+objdst%sdaveELL    = objsrc%sdaveELL
+objdst%sdaveMT     = objsrc%sdaveMT
+objdst%arpar       = objsrc%arpar
+objdst%arparSWD    = objsrc%arparSWD
+objdst%arparELL    = objsrc%arparELL
+objdst%idxar       = objsrc%idxar
+objdst%idxarSWD    = objsrc%idxarSWD
+objdst%idxarELL    = objsrc%idxarELL
+objdst%gvoroidx    = objsrc%gvoroidx
+objdst%DobsR       = objsrc%DobsR
+objdst%DpredR      = objsrc%DpredR
+objdst%DobsV       = objsrc%DobsV
+objdst%DpredV      = objsrc%DpredV
+objdst%DobsT       = objsrc%DobsT
+objdst%DpredT      = objsrc%DpredT
+objdst%S           = objsrc%S
+objdst%DresR       = objsrc%DresR
+objdst%DresV       = objsrc%DresV
+objdst%DresT       = objsrc%DresT
+objdst%DarR        = objsrc%DarR
+objdst%DarV        = objsrc%DarV
+objdst%DarT        = objsrc%DarT
+objdst%DobsSWD     = objsrc%DobsSWD
+objdst%DpredSWD    = objsrc%DpredSWD
+objdst%DresSWD     = objsrc%DresSWD
+objdst%DarSWD      = objsrc%DarSWD
+objdst%periods     = objsrc%periods
+objdst%DobsELL     = objsrc%DobsELL
+objdst%DpredELL    = objsrc%DpredELL
+objdst%DresELL     = objsrc%DresELL
+objdst%DarELL      = objsrc%DarELL
+objdst%periods_ELL = objsrc%periods_ELL
+objdst%DobsMT      = objsrc%DobsMT
+objdst%DpredMT     = objsrc%DpredMT
+objdst%DresMT      = objsrc%DresMT
+objdst%freqMT      = objsrc%freqMT
+
+END SUBROUTINE COPY_OBJ

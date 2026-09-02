@@ -55,7 +55,9 @@ loop_on_layers: DO I = Nl-1, 1, -1
 !WRITE(*,*) R
 
 c = SQRT( wu0 / (2.0_RP*sigma(1)) )
-d = CMPLX(c, -c, RP)
+!! c is COMPLEX but carries a purely real value; CMPLX(complex,y) is non-standard
+!! (rejected by gfortran) -- take the real part explicitly, numerically identical.
+d = CMPLX(REAL(c,RP), -REAL(c,RP), RP)
 ZMT = CONJG(d * R)
 real_R = REAL(R)
 imag_R = AIMAG(R)

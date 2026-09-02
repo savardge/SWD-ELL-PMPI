@@ -28,7 +28,7 @@
 2              !! NLMN        Min number of layers
 30             !! NLMX        Max number of layers
 1              !! ICHAINTHIN  Chain thinning interval
-1e2            !! NKEEP       No. models to keep before writing
+100            !! NKEEP       No. models to keep before writing
 6             !! NPTCHAINS1  No. chains at T=1
 1.15             !! dTlog       Temperature increment
 3.0           !! lambda      Parameter for Poisson prior on k

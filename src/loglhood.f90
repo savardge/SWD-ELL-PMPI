@@ -2132,9 +2132,9 @@ REAL(KIND=DRP),DIMENSION(NLMX,NPL):: tmpsort
 obj%nunique = obj%k-1
 
 tmpsort = 0._DRP
-tmpsort = REAL(obj%voro(1:obj%k,:),DRP)
+tmpsort(1:obj%k,:) = REAL(obj%voro(1:obj%k,:),DRP)
 CALL QSORTC2D(tmpsort(1:obj%k,:),obj%voroidx(1:obj%k,:))
-obj%voro(1:obj%k,:) = REAL(tmpsort,RP)
+obj%voro(1:obj%k,:) = REAL(tmpsort(1:obj%k,:),RP)
 
 obj%ziface = 0._RP
 obj%ziface(1:obj%k-1) = obj%voro(2:obj%k,1)
@@ -2257,9 +2257,9 @@ ELSE
 ENDIF
 
 tmpsort = 0._DRP
-tmpsort = REAL(obj%voro(1:obj%k,:),DRP)
+tmpsort(1:obj%k,:) = REAL(obj%voro(1:obj%k,:),DRP)
 CALL QSORTC2D(tmpsort(1:obj%k,:),obj%voroidx(1:obj%k,:))
-obj%voro(1:obj%k,:) = REAL(tmpsort,RP)
+obj%voro(1:obj%k,:) = REAL(tmpsort(1:obj%k,:),RP)
 
 !!
 !! Use local variable for voro and voroidx to allow easy change
@@ -2321,9 +2321,9 @@ ENDDO
 
 ntot = SUM(niface)
 tmpsort2 = 0._DRP
-tmpsort2 = REAL(obj%ziface(1:ntot),DRP)
+tmpsort2(1:ntot) = REAL(obj%ziface(1:ntot),DRP)
 CALL QSORTC1D(tmpsort2(1:ntot))
-obj%ziface(1:ntot) = REAL(tmpsort2,RP)
+obj%ziface(1:ntot) = REAL(tmpsort2(1:ntot),RP)
 
 !!
 !!  Find unique interfaces

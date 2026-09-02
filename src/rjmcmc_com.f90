@@ -227,7 +227,7 @@ MODULE RJMCMC_COM
    INTEGER(KIND=IB)                             :: icovIter!!, covIter_nsamples
    INTEGER(KIND=IB)                             :: covIter_zero_nsamples, covITER_period, MAXcovIter
    INTEGER(KIND=IB)                             :: ICOV_iterUpdate, ICOV_iterUpdate_RV, ICOV_iterUpdate_SWD, ICOV_iterUpdate_ELL, ICOV_iterUpdate_MT  
-   INTEGER(KIND=IB)                             :: cov_converged
+   LOGICAL                                      :: cov_converged   !! assigned .TRUE./.FALSE. everywhere; was INTEGER (PGI accepted integer-as-logical)
    INTEGER(KIND=IB)                             :: ISD_RV_covIter, ISD_SWD_covIter, ISD_ELL_covIter, ISD_MT_covIter
    INTEGER(KIND=IB)                             :: CHAINTHIN_COVest_period_zeroIter, CHAINTHIN_COVest_period_nonzeroIter                               
    INTEGER(KIND=IB)                             :: NRF2, NMODE2, NMODE_ELL2, NMT2, ncount3                                  

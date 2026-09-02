@@ -13,10 +13,8 @@ INTEGER(KIND=IB) :: oldtypes(NFIELD), blockcounts(NFIELD)
 INTEGER(KIND=MPI_ADDRESS_KIND) :: offsets(NFIELD)
 INTEGER(KIND=IB) :: iextent,rextent,dextent
 
-!  Need to first figure offset by getting size of MPI_REAL etc 
-call MPI_TYPE_EXTENT(MPI_INTEGER, iextent, ierr)
-call MPI_TYPE_EXTENT(MPI_REAL, rextent, ierr)
-call MPI_TYPE_EXTENT(MPI_DOUBLE_PRECISION, dextent, ierr)
+!  MPI_TYPE_EXTENT calls removed: deleted in Open MPI 5, and the results
+!  (iextent/rextent/dextent) were never used -- offsets come from mpi_get_address.
 
 !!
 !! Lengths of arrays
