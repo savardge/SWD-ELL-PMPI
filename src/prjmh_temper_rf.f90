@@ -31,7 +31,6 @@ USE NR
 !USE SAC_I_O
 USE ieee_arithmetic
 IMPLICIT NONE
-!INCLUDE 'raysum/params.h'
 INTRINSIC RANDOM_NUMBER, RANDOM_SEED
 
 INTEGER(KIND=IB)  :: i,j,ipar,ipar2,ifr,ilay,ifreq,imcmc,ithin,isource,ikeep,ikeep2,iDres,is,ie,ik,iaz
@@ -91,12 +90,10 @@ IF (rank==src) CALL PRINTPAR2()
 CALL READCOVPARFile()
 
 !! to prevent Bug
-IF (I_RV==0) ICOV_iterUpdate_RV = 0
 IF (I_SWD==0) ICOV_iterUpdate_SWD = 0
 IF (I_ELL==0) ICOV_iterUpdate_ELL = 0
-IF (I_MT==0) ICOV_iterUpdate_MT = 0
 
-ICOViter_datasets = (/ICOV_iterUpdate_RV, ICOV_iterUpdate_SWD, ICOV_iterUpdate_ELL, ICOV_iterUpdate_MT /) 
+ICOViter_datasets = (/ICOV_iterUpdate_SWD, ICOV_iterUpdate_ELL /)
 cov_converged_datasets = 1
 WHERE (ICOViter_datasets == 1) cov_converged_datasets = 0 
 
@@ -137,15 +134,14 @@ IF(rank == src)THEN
   END IF
 
 ENDIF
-IF (rank==src) WRITE(*,*) 'NRF1, NMODE = NMODE_ELL', NRF1, NMODE, NMODE_ELL
-ncount1 = NFPMX+NAP+3*NRF1+3*NRF1+2*NMODE+2*NMODE_ELL+1 !! 1 is added in the end for sdparMT (my comment)
-ncount2 = NFPMX+1+3*NRF1+3*NRF1+2*NMODE+2*NMODE_ELL + 1
-ncount3 = NRF2*NTIME + NMODE2*NDAT_SWD + NMODE_ELL2*NDAT_ELL + NMT2*2*NDAT_MT + 1
+IF (rank==src) WRITE(*,*) 'NMODE, NMODE_ELL =', NMODE, NMODE_ELL
+ncount1 = NFPMX+NAP+2*NMODE+2*NMODE_ELL   !! sample row: 4 + voro + sdparSWD,sdparELL,arparSWD,arparELL + 6
+ncount2 = NFPMX+1+2*NMODE+2*NMODE_ELL      !! map_voro: k, voro, sdparSWD, sdparELL, arparSWD, arparELL
+ncount3 = NMODE2*NDAT_SWD + NMODE_ELL2*NDAT_ELL + 1
 
 !ALLOCATE( sample(NKEEP,ncount1),tmpvoro(NFPMX) )
 ALLOCATE( tmpvoro(NFPMX) )
 ALLOCATE( tmpmap(ncount2) )
-ALLOCATE( taper_dpred(NTIME) )
 !sample       = 0._RP
 ALLOCATE( icount(NTHREAD) )
 
@@ -240,7 +236,6 @@ END IF
 !!
 IF (icovIter>0_IB) THEN   
     !! variables iniatialized in RJMCMC_COM module
-    raysumfail = 0_IB
     !kmin     = 0  !! changes inside READPARFILE()
     !kmax     = 0  !! changes inside READPARFILE()
     !NKEEP      = 1E1_IB   !! changes inside READPARFILE()
@@ -272,18 +267,13 @@ IF (icovIter>0_IB) THEN
     obj%iaccept_bd = 0
     obj%ireject_bds = 0
     obj%iaccept_bds = 0
-    obj%idxar = 0
     obj%gvoroidx = 0
-    obj%S = 0
     objnew%ireject_bd = 0
     objnew%iaccept_bd = 0
     objnew%ireject_bds = 0
     objnew%iaccept_bds = 0  !! I have been coservative. Reinitializing objnew is probably not necessary
-    objnew%idxar = 0
     objnew%gvoroidx = 0
-    objnew%S = 0
     !! variables initialized by READPARFILE()
-    isoflag = .FALSE.  !! inside ALLOC_RAYSUM()
     sdevm = 0._RP    
 END IF
     !!------------------------------------- 
@@ -349,21 +339,13 @@ obj%k       = INT(tmpmap(1),IB)
 obj%NFP     = (obj%k * NPL)
 obj%voro    = 0._RP
 obj%voroidx = 0
-obj%sdparR  = 0._RP
-obj%sdparV  = 0._RP
-obj%sdparT  = 0._RP
-obj%arpar   = 0._RP
 obj%sdparSWD= 0._RP
 obj%arparSWD= 0._RP
 obj%sdparELL= 0._RP
 obj%arparELL= 0._RP
-obj%sdparMT = 0._RP
 
-obj%sdaveH  = 0._RP
-obj%sdaveV  = 0._RP
 obj%sdaveSWD= 0._RP
 obj%sdaveELL= 0._RP
-obj%sdaveMT = 0._RP
 
 DO ivo = 1,obj%k
   ipar = (ivo-1)*NPL+2
@@ -377,29 +359,11 @@ DO ivo = 1,obj%k
     ENDIF
   ENDDO
 ENDDO
-IF(ICOV >= 1)THEN
-  IF(I_RV == -1 .OR. I_RV == 1) obj%sdparR = tmpmap(NFPMX+1+1:NFPMX+1+NRF1)
-  IF(I_RV == 1) obj%sdparV   = tmpmap(NFPMX+1+1+NRF1:NFPMX+1+2*NRF1)
-  IF(I_T == 1) obj%sdparT   = tmpmap(NFPMX+1+1+2*NRF1:NFPMX+1+3*NRF1)
-END IF
-IF(ICOV_SWD >= 1) THEN
-  IF(I_SWD == 1) obj%sdparSWD = tmpmap(NFPMX+1+1+3*NRF1:NFPMX+1+3*NRF1+NMODE)
-END IF
-IF(ICOV_ELL >= 1) THEN
-  IF(I_ELL == 1) obj%sdparELL = tmpmap(NFPMX+1+3*NRF1+NMODE+1:NFPMX+1+3*NRF1+NMODE+NMODE_ELL)
-END IF
-IF(ICOV_MT >= 1) THEN
-  IF(I_MT == 1) obj%sdparMT = tmpmap(NFPMX+1+3*NRF1+NMODE+NMODE_ELL+1)
-END IF
-
+IF(ICOV_SWD >= 1 .AND. I_SWD == 1) obj%sdparSWD = tmpmap(NFPMX+2:NFPMX+1+NMODE)
+IF(ICOV_ELL >= 1 .AND. I_ELL == 1) obj%sdparELL = tmpmap(NFPMX+1+NMODE+1:NFPMX+1+NMODE+NMODE_ELL)
 IF(IAR == 1)THEN
-  obj%arpar = tmpmap(NFPMX+1+3*NRF1+NMODE+NMODE_ELL+2:NFPMX+3*NRF1+NMODE+NMODE_ELL+3*NRF1+2)
-  obj%arparSWD = tmpmap(NFPMX+1+3*NRF1+NMODE+NMODE_ELL+3*NRF1+2:NFPMX+3*NRF1+NMODE+NMODE_ELL+3*NRF1+NMODE+2)
-  obj%arparELL = tmpmap(NFPMX+1+3*NRF1+NMODE+NMODE_ELL+3*NRF1+NMODE+2:NFPMX+3*NRF1+NMODE+NMODE_ELL+3*NRF1+NMODE+NMODE_ELL+2)
-  obj%idxar = 1
-  DO ipar = 1,NRF1
-    IF(obj%arpar(ipar) < minlimar(ipar)) obj%idxar(ipar) = 0
-  ENDDO
+  obj%arparSWD = tmpmap(NFPMX+1+NMODE+NMODE_ELL+1:NFPMX+1+2*NMODE+NMODE_ELL)
+  obj%arparELL = tmpmap(NFPMX+1+2*NMODE+NMODE_ELL+1:NFPMX+1+2*NMODE+2*NMODE_ELL)
   obj%idxarSWD = 1
   DO ipar = 1,NMODE
     IF(obj%arparSWD(ipar) < minlimarSWD(ipar)) obj%idxarSWD(ipar) = 0
@@ -485,10 +449,8 @@ IF(ISMPPRIOR == 1)CALL LOGLHOOD2(obj)
 IF (icovIter > 0_IB)  THEN
 
     IF (ICOVest==1) THEN
-        IF(I_RV==-1) sampleDres(1, 1:NRF2*NTIME) = obj%DresR(NRF1,:)
-        IF(I_SWD==1) sampleDres(1, NRF2*NTIME+1:NRF2*NTIME+NMODE2*NDAT_SWD) = obj%DresSWD(NMODE,:) 
-        IF(I_ELL==1) sampleDres(1, NRF2*NTIME+NMODE2*NDAT_SWD+1:NRF2*NTIME+NMODE2*NDAT_SWD+NMODE_ELL2*NDAT_ELL) = obj%DresELL(NMODE_ELL,:)
-        IF(I_MT==1)  sampleDres(1, NRF2*NTIME+NMODE2*NDAT_SWD+NMODE_ELL2*NDAT_ELL+1:NRF2*NTIME+NMODE2*NDAT_SWD+NMODE_ELL2*NDAT_ELL+NMT2*2*NDAT_MT) = obj%DresMT
+        IF(I_SWD==1) sampleDres(1, 1:NMODE2*NDAT_SWD) = obj%DresSWD(NMODE,:) 
+        IF(I_ELL==1) sampleDres(1, NMODE2*NDAT_SWD+1:NMODE2*NDAT_SWD+NMODE_ELL2*NDAT_ELL) = obj%DresELL(NMODE_ELL,:)
         sampleDres(1, ncount3) = 1._RP
 
     ELSEIF (ICOVest==2) THEN
@@ -553,21 +515,12 @@ IF(rank == src) THEN
   !! print some info
   IF(icovIter>0_IB) THEN
       CALL PRINTPAR2()      
-      IF(ICOV >= 1)THEN
-          IF(I_RV == -1 .OR. I_RV ==1) WRITE(6,*) 'SD parameters:'
-          IF(I_RV == -1 .OR. I_RV ==1) WRITE(6,206) 'sigma H   = ',obj%sdparR
-          IF(I_RV == -1 .OR. I_RV ==1) WRITE(6,206) 'sigma V   = ',obj%sdparV
-          IF(I_RV == -1 .OR. I_RV ==1) WRITE(6,206) 'sigma T   = ',obj%sdparT
-      END IF
       IF(ICOV_SWD >= 1) THEN
           IF(I_SWD == 1) WRITE(6,206) 'sigma SWD = ',obj%sdparSWD
       END IF
       IF(ICOV_ELL >= 1) THEN
           IF(I_ELL == 1) WRITE(6,206) 'sigma ELL = ',obj%sdparELL
       END IF
-      IF(ICOV_MT >= 1) THEN
-          IF(I_MT == 1) WRITE(6,206) 'sigma MT = ',obj%sdparMT
-      ENDIF
   END IF
   206 FORMAT(a,128ES12.3)
 
@@ -785,83 +738,6 @@ CALL COPY_OBJ(objnew1,obj)
 !! Do Metropolis-Hastings on data-error standard deviations
 !!
 IF(1 == 1)THEN
-IF(ICOV >= 1)THEN
-  !!
-  !! Sample standard deviation of R and V components
-  !!
-  IF(I_RV >= 1 .OR. I_RV == -1)THEN
-  IF (ISD_RV == 1)THEN
-  !! Perturb std devs with .10 probability
-  CALL RANDOM_NUMBER(ran_uni_ar)
-  IF(ran_uni_ar>=0.50_RP)THEN
-    DO ipar = 1,NRF1
-      CALL PROPOSAL_SDH(obj,objnew1,ipar)
-      IF(ioutside == 0)THEN
-        IF(ISMPPRIOR == 0)CALL LOGLHOOD(objnew1,0)
-        IF(ISMPPRIOR == 1)CALL LOGLHOOD2(objnew1)
-        logPLratio = (objnew1%logL - obj%logL)*beta_mh
-        CALL RANDOM_NUMBER(ran_uni)
-        IF(ran_uni >= EXP(logPLratio))THEN
-          CALL COPY_OBJ(objnew1,obj)
-          ireject = ireject + 1
-        ELSE
-          CALL COPY_OBJ(obj,objnew1)
-          iaccept = iaccept + 1
-        ENDIF
-      ELSE
-        CALL COPY_OBJ(objnew1,obj)
-        ireject = ireject + 1
-        ioutside = 0
-      ENDIF
-    ENDDO
-    IF(I_RV >= 1)THEN
-      DO ipar = 1,NRF1
-        CALL PROPOSAL_SDV(obj,objnew1,ipar)
-        IF(ioutside == 0)THEN
-          IF(ISMPPRIOR == 0)CALL LOGLHOOD(objnew1,0)
-          IF(ISMPPRIOR == 1)CALL LOGLHOOD2(objnew1)
-          logPLratio = (objnew1%logL - obj%logL)*beta_mh
-          CALL RANDOM_NUMBER(ran_uni)
-          IF(ran_uni >= EXP(logPLratio))THEN
-            CALL COPY_OBJ(objnew1,obj)
-            ireject = ireject + 1
-          ELSE
-            CALL COPY_OBJ(obj,objnew1)
-            iaccept = iaccept + 1
-          ENDIF
-        ELSE
-          CALL COPY_OBJ(objnew1,obj)
-          ireject = ireject + 1
-          ioutside = 0
-        ENDIF
-      ENDDO
-    ENDIF
-    IF(I_T == 1)THEN
-      DO ipar = 1,NRF1
-        CALL PROPOSAL_SDT(obj,objnew1,ipar)
-        IF(ioutside == 0)THEN
-          IF(ISMPPRIOR == 0)CALL LOGLHOOD(objnew1,0)
-          IF(ISMPPRIOR == 1)CALL LOGLHOOD2(objnew1)
-          logPLratio = (objnew1%logL - obj%logL)*beta_mh
-          CALL RANDOM_NUMBER(ran_uni)
-          IF(ran_uni >= EXP(logPLratio))THEN
-            CALL COPY_OBJ(objnew1,obj)
-            ireject = ireject + 1
-          ELSE
-            CALL COPY_OBJ(obj,objnew1)
-            iaccept = iaccept + 1
-          ENDIF
-        ELSE
-          CALL COPY_OBJ(objnew1,obj)
-          ireject = ireject + 1
-          ioutside = 0
-        ENDIF
-      ENDDO
-    ENDIF
-  ENDIF
-  ENDIF  !! ISD_RV
-  ENDIF  !! IRV
-END IF   !! ICOV>=1
 
 IF(ICOV_SWD >= 1) THEN
   !!
@@ -929,134 +805,6 @@ IF (ICOV_ELL >= 1) THEN
   ENDIF !! I_ELL
 END IF  !! ICOV_ELL >= 1
 
-IF(ICOV_MT >= 1) THEN
-  !!
-  !! sample standard deviation of MT
-  !!
-  IF(I_MT == 1)THEN
-  IF (ISD_MT == 1)THEN
-  CALL RANDOM_NUMBER(ran_uni_ar)
-  IF(ran_uni_ar>=0.10_RP)THEN
-      CALL PROPOSAL_SDMT(obj,objnew1,1)
-      IF(ioutside == 0)THEN
-        IF(ISMPPRIOR == 0)CALL LOGLHOOD(objnew1,0)
-        IF(ISMPPRIOR == 1)CALL LOGLHOOD2(objnew1)
-        logPLratio = (objnew1%logL - obj%logL)*beta_mh
-        CALL RANDOM_NUMBER(ran_uni)
-        IF(ran_uni >= EXP(logPLratio))THEN
-          CALL COPY_OBJ(objnew1,obj)
-          ireject = ireject + 1
-        ELSE
-          CALL COPY_OBJ(obj,objnew1)
-          iaccept = iaccept + 1
-        ENDIF
-      ELSE
-        CALL COPY_OBJ(objnew1,obj)
-        ireject = ireject + 1
-        ioutside = 0
-      ENDIF
-  ENDIF  
-  ENDIF !! ISD_MT
-  ENDIF !! I_MT
-ENDIF ! ICOV_MT >= 1
-!!
-!! Do Metropolis-Hastings on autoregressive model
-!!
-IF(IAR == 1)THEN
-!IF(I_RV == 1)THEN
-!  !! Perturb AR model with .25 probability
-!  CALL RANDOM_NUMBER(ran_uni_ar)
-!  IF(ran_uni_ar>=0.25_RP)THEN
-!    DO ipar = 1,3*NRF1
-!      IF(obj%idxar(ipar) == 0)THEN
-!        !! Propose birth
-!        arptype = 1
-!        logarp = LOG(0.5_RP)
-!      ELSE
-!        CALL RANDOM_NUMBER(ran_uni_ar)
-!        IF(ran_uni_ar>=0.5_RP)THEN
-!          !! Propose death
-!          arptype = 2
-!          logarp = LOG(2._RP)
-!        ELSE
-!          !! Propose perturb
-!          arptype = 3
-!          logarp = 0._RP
-!        ENDIF
-!      ENDIF
-!      CALL PROPOSAL_AR(obj,objnew1,ipar,arptype)
-!      IF(ioutside == 0)THEN
-!        IF(ISMPPRIOR == 0)CALL LOGLHOOD(objnew1,0)
-!        IF(ISMPPRIOR == 1)CALL LOGLHOOD2(objnew1)
-!        !!logPLratio = (objnew1%logL - obj%logL)*beta_mh
-!        !! Input Birth Death AR here:
-!        logPLratio = logarp + (objnew1%logL - obj%logL)*beta_mh
-!        CALL RANDOM_NUMBER(ran_uni)
-!        IF(ran_uni >= EXP(logPLratio))THEN
-!          objnew1 = obj
-!          ireject = ireject + 1
-!        ELSE
-!          obj = objnew1
-!          iaccept = iaccept + 1
-!        ENDIF
-!      ELSE
-!        objnew1 = obj
-!        ireject = ireject + 1
-!        ioutside = 0
-!      ENDIF
-!      i_sdpert = 0
-!    ENDDO
-!  ENDIF
-!ENDIF ! I_RV if
-!!
-!! Sampling RF case:
-!!
-IF(I_RV == -1)THEN
-  !! Perturb AR model with .25 probability
-  CALL RANDOM_NUMBER(ran_uni_ar)
-  IF(ran_uni_ar>=0._RP)THEN
-    DO ipar = 1,NRF1
-      IF(obj%idxar(ipar) == 0)THEN
-        !! Propose birth
-        arptype = 1
-        logarp = LOG(0.5_RP)
-      ELSE
-        CALL RANDOM_NUMBER(ran_uni_ar)
-        IF(ran_uni_ar>=0.5_RP)THEN
-          !! Propose death
-          arptype = 2
-          logarp = LOG(2._RP)
-        ELSE
-          !! Propose perturb
-          arptype = 3
-          logarp = 0._RP
-        ENDIF
-      ENDIF
-      CALL PROPOSAL_ARRF(obj,objnew1,ipar,arptype)
-      IF(ioutside == 0)THEN
-        IF(ISMPPRIOR == 0)CALL LOGLHOOD(objnew1,0)
-        IF(ISMPPRIOR == 1)CALL LOGLHOOD2(objnew1)
-        !!logPLratio = (objnew1%logL - obj%logL)*beta_mh
-        !! Input Birth Death AR here:
-        logPLratio = logarp + (objnew1%logL - obj%logL)*beta_mh
-        CALL RANDOM_NUMBER(ran_uni)
-        IF(ran_uni >= EXP(logPLratio))THEN
-          CALL COPY_OBJ(objnew1,obj)
-          ireject = ireject + 1
-        ELSE
-          CALL COPY_OBJ(obj,objnew1)
-          iaccept = iaccept + 1
-        ENDIF
-      ELSE
-        CALL COPY_OBJ(objnew1,obj)
-        ireject = ireject + 1
-        ioutside = 0
-      ENDIF
-      i_sdpert = 0
-    ENDDO
-  ENDIF
-ENDIF ! I_RV if
-ENDIF ! AR if
 !!
 !! Do Metropolis-Hastings on autoregressive model SWD
 !!
@@ -1956,72 +1704,10 @@ RETURN
 END SUBROUTINE PROPOSAL
 !=======================================================================
 
-SUBROUTINE PROPOSAL_AR(obj,objnew,iwhich,arptype)
-!=======================================================================
-USE DATA_TYPE
-USE RJMCMC_COM
-IMPLICIT NONE
-INTEGER(KIND=IB) :: iwhich,arptype
-TYPE(objstruc) :: obj,objnew
-REAL(KIND=RP)  :: ran_nor,ran_uni
 
-!! Birth: sample uniform from prior
-IF(arptype == 1)THEN
-  CALL RANDOM_NUMBER(ran_uni)
-  objnew%arpar(iwhich) = ran_uni*(maxlimar(iwhich)-minlimar(iwhich))+minlimar(iwhich)
-  objnew%idxar(iwhich) = 1
-  IF(((objnew%arpar(iwhich) - minlimar(iwhich)) < 0._RP).OR. &
-     ((maxlimar(iwhich) - objnew%arpar(iwhich)) < 0._RP))ioutside = 1
-ENDIF
-!! Death
-IF(arptype == 2)THEN
-  objnew%arpar(iwhich) = minlimar(iwhich)-1._RP
-  objnew%idxar(iwhich) = 0
-ENDIF
-!! Perturb
-IF(arptype == 3)THEN
-  CALL GASDEVJ(ran_nor)
-  objnew%arpar(iwhich) = obj%arpar(iwhich) + pertarsd(iwhich)*ran_nor
-  IF(((objnew%arpar(iwhich) - minlimar(iwhich)) < 0._RP).OR. &
-     ((maxlimar(iwhich) - objnew%arpar(iwhich)) < 0._RP))ioutside = 1
-ENDIF
-
-RETURN
-END SUBROUTINE PROPOSAL_AR
 !=======================================================================
 
-SUBROUTINE PROPOSAL_ARRF(obj,objnew,iwhich,arptype)
-!=======================================================================
-USE DATA_TYPE
-USE RJMCMC_COM
-IMPLICIT NONE
-INTEGER(KIND=IB) :: iwhich,arptype
-TYPE(objstruc) :: obj,objnew
-REAL(KIND=RP)  :: ran_nor,ran_uni
 
-!! Birth: sample uniform from prior
-IF(arptype == 1)THEN
-  CALL RANDOM_NUMBER(ran_uni)
-  objnew%arpar(iwhich) = ran_uni*(maxlimar(iwhich)-minlimar(iwhich))+minlimar(iwhich)
-  objnew%idxar(iwhich) = 1
-  IF(((objnew%arpar(iwhich) - minlimar(iwhich)) < 0._RP).OR. &
-     ((maxlimar(iwhich) - objnew%arpar(iwhich)) < 0._RP))ioutside = 1
-ENDIF
-!! Death
-IF(arptype == 2)THEN
-  objnew%arpar(iwhich) = minlimar(iwhich)-1._RP
-  objnew%idxar(iwhich) = 0
-ENDIF
-!! Perturb
-IF(arptype == 3)THEN
-  CALL GASDEVJ(ran_nor)
-  objnew%arpar(iwhich) = obj%arpar(iwhich) + pertarsd(iwhich)*ran_nor
-  IF(((objnew%arpar(iwhich) - minlimar(iwhich)) < 0._RP).OR. &
-     ((maxlimar(iwhich) - objnew%arpar(iwhich)) < 0._RP))ioutside = 1
-ENDIF
-
-RETURN
-END SUBROUTINE PROPOSAL_ARRF
 !=======================================================================
 
 SUBROUTINE PROPOSAL_ARSWD(obj,objnew,iwhich,arptype)
@@ -2092,65 +1778,13 @@ RETURN
 END SUBROUTINE PROPOSAL_ARELL
 !=======================================================================
 
-SUBROUTINE PROPOSAL_SDH(obj,objnew,iwhich)
-!=======================================================================
-USE DATA_TYPE
-USE RJMCMC_COM
-IMPLICIT NONE
-INTEGER(KIND=IB) :: iwhich
-TYPE(objstruc) :: obj,objnew
-REAL(KIND=RP)  :: ran_nor
 
-!!
-!! Gaussian proposal
-!!
-CALL GASDEVJ(ran_nor)
-objnew%sdparR(iwhich) = obj%sdparR(iwhich) + pertsdsd(iwhich)*ran_nor
-IF(((objnew%sdparR(iwhich) - minlimsd(iwhich)) < 0._RP).OR.((maxlimsd(iwhich) - objnew%sdparR(iwhich)) < 0._RP))ioutside = 1
-
-RETURN
-END SUBROUTINE PROPOSAL_SDH
 !=======================================================================
 
-SUBROUTINE PROPOSAL_SDV(obj,objnew,iwhich)
-!=======================================================================
-USE DATA_TYPE
-USE RJMCMC_COM
-IMPLICIT NONE
-INTEGER(KIND=IB) :: iwhich
-TYPE(objstruc) :: obj,objnew
-REAL(KIND=RP)  :: ran_nor
 
-!!
-!! Gaussian proposal
-!!
-CALL GASDEVJ(ran_nor)
-objnew%sdparV(iwhich) = obj%sdparV(iwhich) + pertsdsd(iwhich)*ran_nor
-IF(((objnew%sdparV(iwhich) - minlimsd(iwhich)) < 0._RP).OR. & 
-   ((maxlimsd(iwhich) - objnew%sdparV(iwhich)) < 0._RP))ioutside = 1
-
-RETURN
-END SUBROUTINE PROPOSAL_SDV
 !=======================================================================
 
-SUBROUTINE PROPOSAL_SDT(obj,objnew,iwhich)
-!=======================================================================
-USE DATA_TYPE
-USE RJMCMC_COM
-IMPLICIT NONE
-INTEGER(KIND=IB) :: iwhich
-TYPE(objstruc) :: obj,objnew
-REAL(KIND=RP)  :: ran_nor
 
-!!
-!! Gaussian proposal
-!!
-CALL GASDEVJ(ran_nor)
-objnew%sdparT(iwhich) = obj%sdparT(iwhich) + pertsdsd(iwhich)*ran_nor
-IF(((objnew%sdparT(iwhich) - minlimsd(iwhich)) < 0._RP).OR.((maxlimsd(iwhich) - objnew%sdparT(iwhich)) < 0._RP))ioutside = 1
-
-RETURN
-END SUBROUTINE PROPOSAL_SDT
 !=======================================================================
 
 SUBROUTINE PROPOSAL_SDSWD(obj,objnew,iwhich)
@@ -2198,25 +1832,7 @@ END SUBROUTINE PROPOSAL_SDELL
 !==============================================================================
 !==============================================================================
 
-SUBROUTINE PROPOSAL_SDMT(obj,objnew,iwhich)
-!=======================================================================
-USE DATA_TYPE
-USE RJMCMC_COM
-IMPLICIT NONE
-INTEGER(KIND=IB) :: iwhich
-TYPE(objstruc) :: obj,objnew
-REAL(KIND=RP)  :: ran_nor
 
-!!
-!! Gaussian proposal
-!!
-CALL GASDEVJ(ran_nor)
-objnew%sdparMT(iwhich) = obj%sdparMT(iwhich) + pertsdsdMT(iwhich)*ran_nor
-IF(((objnew%sdparMT(iwhich) - minlimsdMT(iwhich)) < 0._RP).OR. &
-   ((maxlimsdMT(iwhich) - objnew%sdparMT(iwhich)) < 0._RP))ioutside = 1
-
-RETURN
-END SUBROUTINE PROPOSAL_SDMT
 
 !==============================================================================
 SUBROUTINE CHECKBOUNDS(obj)
@@ -2467,17 +2083,14 @@ DO ic = 1,2
 !                          REAL(objm(ic)%ipropose_bd,RP),REAL(i_bd,RP),objm(ic)%tcmp,REAL(isource,RP) /)
      !WRITE(*,*) 'logL= ', objm(ic)%logL
      sample(ikeep,:) =  (/ objm(ic)%logL, objm(ic)%logPr, objm(ic)%tcmp, REAL(objm(ic)%k,RP), & ! 4 parameters
-                           tmpvoro,objm(ic)%sdparR,objm(ic)%sdparV,objm(ic)%sdparT,objm(ic)%sdparSWD,objm(ic)%sdparELL,objm(ic)%sdparMT,  &
-                           objm(ic)%arpar,objm(ic)%arparSWD,objm(ic)%arparELL, &
+                           tmpvoro,objm(ic)%sdparSWD,objm(ic)%sdparELL,objm(ic)%arparSWD,objm(ic)%arparELL, &
                            REAL(iaccept,RP)/REAL(iaccept+ireject,RP),REAL(objm(ic)%iaccept_bd,RP),&
                            REAL(objm(ic)%ireject_bd,RP),REAL(objm(ic)%iaccept_bds,RP),REAL(ic,RP),REAL(isource,RP) /)
     !!----------------------------------------------------------------------------------------
     IF (.NOT.cov_converged) THEN
     IF ( (ICOVest==2) .AND. (MOD(imcmc1,CHAINTHIN_COVest_period)==0) ) THEN
-        IF(I_RV==-1) sample2(ikeep2, 1:NRF2*NTIME) = objm(ic)%DresR(NRF1,:)
-        IF(I_SWD==1) sample2(ikeep2, NRF2*NTIME+1:NRF2*NTIME+NMODE2*NDAT_SWD) = objm(ic)%DresSWD(NMODE,:) 
-        IF(I_ELL==1) sample2(ikeep2, NRF2*NTIME+NMODE2*NDAT_SWD+1:NRF2*NTIME+NMODE2*NDAT_SWD+NMODE_ELL2*NDAT_ELL) = objm(ic)%DresELL(NMODE_ELL,:)
-        IF(I_MT==1)  sample2(ikeep2, NRF2*NTIME+NMODE2*NDAT_SWD+NMODE_ELL2*NDAT_ELL+1:NRF2*NTIME+NMODE2*NDAT_SWD+NMODE_ELL2*NDAT_ELL+NMT2*2*NDAT_MT) = objm(ic)%DresMT
+        IF(I_SWD==1) sample2(ikeep2, 1:NMODE2*NDAT_SWD) = objm(ic)%DresSWD(NMODE,:) 
+        IF(I_ELL==1) sample2(ikeep2, NMODE2*NDAT_SWD+1:NMODE2*NDAT_SWD+NMODE_ELL2*NDAT_ELL) = objm(ic)%DresELL(NMODE_ELL,:)
         sample2(ikeep2, ncount3) = LOG(pk(objm(ic)%k)) + objm(ic)%logL
         ikeep2 = ikeep2 + 1_IB
         IF(ikeep2 > NKEEP3)THEN
@@ -2544,81 +2157,16 @@ END SUBROUTINE
 !=======================================================================
 SUBROUTINE SAVEREPLICA(obj)
 !=======================================================================
+!! Write observed / predicted / AR data of the current model (IMAP mode).
 USE RJMCMC_COM
 IMPLICIT NONE
-
-INTEGER(KIND=IB) :: i, ilayer
+INTEGER(KIND=IB) :: i
 TYPE (objstruc)  :: obj      ! Best object
 
 WRITE(6,*) 'Global best model:'
 CALL PRINTPAR(obj)
 WRITE(6,*) 'Global best logL = ',obj%logL
 
-IF(I_RV >= 1)THEN
-  OPEN(UNIT=50,FILE=predfile,FORM='formatted',STATUS='REPLACE', &
-  ACTION='WRITE',RECL=8192)
-  DO i = 1,NRF1
-    WRITE(50,208) obj%DpredR(i,:)
-  ENDDO
-  DO i = 1,NRF1
-    WRITE(50,208) obj%DpredV(i,:)
-  ENDDO
-  DO i = 1,NRF1
-    WRITE(50,208) obj%DpredT(i,:)
-  ENDDO
-  DO i = 1,NRF1
-    WRITE(50,208) obj%S(i,:)
-  ENDDO
-  WRITE(6,*)'Done writing predicted V and H components.'
-  CLOSE(50)
-
-  OPEN(UNIT=50,FILE=obsfile,FORM='formatted',STATUS='REPLACE', &
-  ACTION='WRITE',RECL=8192)
-  DO i = 1,NRF1
-    WRITE(50,208) obj%DobsR(i,:)
-  ENDDO
-  DO i = 1,NRF1
-    WRITE(50,208) obj%DobsV(i,:)
-  ENDDO
-  DO i = 1,NRF1
-    WRITE(50,208) obj%DobsT(i,:)
-  ENDDO
-  WRITE(6,*)'Done writing observed V and H components.'
-  CLOSE(50)
-
-  OPEN(UNIT=50,FILE=arfile,FORM='formatted',STATUS='REPLACE', &
-  ACTION='WRITE',RECL=8192)
-  DO i = 1,NRF1
-    WRITE(50,208) obj%DarR(i,:)
-    WRITE(50,208) obj%DarV(i,:)
-    WRITE(50,208) obj%DarT(i,:)
-  ENDDO
-  CLOSE(50)
-ELSEIF(I_RV == -1)THEN
-  OPEN(UNIT=50,FILE=predfile,FORM='formatted',STATUS='REPLACE', &
-  ACTION='WRITE',RECL=8192)
-  DO i = 1,NRF1
-    WRITE(50,208) obj%DpredR(i,:)
-  ENDDO
-  WRITE(6,*)'Done writing predicted RF.'
-  CLOSE(50)
-
-  OPEN(UNIT=50,FILE=obsfile,FORM='formatted',STATUS='REPLACE', &
-  ACTION='WRITE',RECL=8192)
-  DO i = 1,NRF1
-    WRITE(50,208) obj%DobsR(i,:)
-  ENDDO
-  WRITE(6,*)'Done writing observed RF.'
-  CLOSE(50)
-
-  OPEN(UNIT=50,FILE=arfile,FORM='formatted',STATUS='REPLACE', &
-  ACTION='WRITE',RECL=8192)
-  DO i = 1,NRF1
-    WRITE(50,208) obj%DarR(i,:)
-  ENDDO
-  CLOSE(50)
-
-ENDIF
 IF(I_SWD == 1)THEN
   OPEN(UNIT=50,FILE=predfileSWD,FORM='formatted',STATUS='REPLACE', &
   ACTION='WRITE',RECL=8192)
@@ -2627,7 +2175,6 @@ IF(I_SWD == 1)THEN
   ENDDO
   WRITE(6,*)'Done writing predicted SWD curve.'
   CLOSE(50)
-
   OPEN(UNIT=50,FILE=obsfileSWD,FORM='formatted',STATUS='REPLACE', &
   ACTION='WRITE',RECL=8192)
   DO i = 1,NMODE
@@ -2635,17 +2182,14 @@ IF(I_SWD == 1)THEN
   ENDDO
   WRITE(6,*)'Done writing observed SWD curve.'
   CLOSE(50)
-
   OPEN(UNIT=50,FILE=arfileSWD,FORM='formatted',STATUS='REPLACE', &
   ACTION='WRITE',RECL=8192)
   DO i = 1,NMODE
     WRITE(50,208) obj%DarSWD(i,:)
   ENDDO
   CLOSE(50)
-
 ENDIF
 208 FORMAT(5000ES20.10)
-
 IF(I_ELL == 1)THEN
   OPEN(UNIT=50,FILE=predfileELL,FORM='formatted',STATUS='REPLACE', &
   ACTION='WRITE',RECL=8192)
@@ -2654,7 +2198,6 @@ IF(I_ELL == 1)THEN
   ENDDO
   WRITE(6,*)'Done writing predicted ELL curve.'
   CLOSE(50)
-
   OPEN(UNIT=50,FILE=obsfileELL,FORM='formatted',STATUS='REPLACE', &
   ACTION='WRITE',RECL=8192)
   DO i = 1,NMODE_ELL
@@ -2662,50 +2205,13 @@ IF(I_ELL == 1)THEN
   ENDDO
   WRITE(6,*)'Done writing observed ELL curve.'
   CLOSE(50)
-
   OPEN(UNIT=50,FILE=arfileELL,FORM='formatted',STATUS='REPLACE', &
   ACTION='WRITE',RECL=8192)
   DO i = 1,NMODE_ELL
     WRITE(50,208) obj%DarELL(i,:)
   ENDDO
   CLOSE(50)
-
 ENDIF
-
-IF(I_MT == 1)THEN
-   OPEN(UNIT=50,FILE=predfileMT,FORM='formatted',STATUS='REPLACE', &
-   ACTION='WRITE',RECL=8192)
-
-   WRITE(50,208) obj%DpredMT
-   
-   WRITE(6,*)'Done writing predicted MT curve.'
-   CLOSE(50)
- 
-   OPEN(UNIT=50,FILE=obsfileMT,FORM='formatted',STATUS='REPLACE', &
-   ACTION='WRITE',RECL=8192)
-   WRITE(50,208) obj%DobsMT
- 
-   WRITE(6,*)'Done writing observed MT curve.'
-   CLOSE(50)
- 
-   !OPEN(UNIT=50,FILE=arfileSWD,FORM='formatted',STATUS='REPLACE', &
-   !ACTION='WRITE',RECL=8192)
-   !DO i = 1,NMODE
-   !  WRITE(50,208) obj%DarSWD(i,:)
-   !ENDDO
-   !CLOSE(50)
- 
-   !!!!!!!!!!!!!!!  Pejman: training dataset for training the surrogate
-
-   !OPEN(UNIT=500,FILE='/data/pejman/trainMT.dat',FORM='formatted',STATUS='REPLACE', &
-   !ACTION='WRITE',RECL=8192)
-
-   !WRITE(500,208) LOG10(obj%freqMT), cur_modMT(1:obj%nunique+1, 2), cur_modMT(1:obj%nunique, 1), obj%DpredMT  !!! thicknesses are in km
-    !WRITE(500,208) LOG10(obj%freqMT), ( cur_modMT(ilayer,:), ilayer=1,obj%nunique  ), cur_modMT(obj%nunique+1,2:NPL), obj%DpredMT  !!!thicknesses are in km
-   !!!!!!!!!!!!!!
-
-ENDIF
-
 RETURN
 END SUBROUTINE SAVEREPLICA
 !=======================================================================
@@ -2801,75 +2307,16 @@ RETURN
 END FUNCTION
 !==============================================================================
 
-FUNCTION CACOS(z)
+
 !==============================================================================
 
-USE DATA_TYPE
-COMPLEX(KIND=RP) :: CACOS
-COMPLEX(KIND=RP) :: z
-REAL(KIND=RP) :: zrp1,zrm1,zi,zizi,a1,a2,a,b
 
-!CACOS = -CMPLX(0._RP,1._RP,RP)*LOG(z+CMPLX(0._RP,1._RP,RP)*SQRT(1._RP-z*z))
-!!
-!! This version from IDL; much faster than above
-!!
-zrp1 = REAL(z,RP)+1._RP
-zrm1 = zrp1-2._RP
-zi = AIMAG(z)
-zizi = zi*zi
-a1 = 0.5_RP*SQRT(zrp1*zrp1 + zizi)
-a2 = 0.5_RP*SQRT(zrm1*zrm1 + zizi)
-a = a1+a2
-b = a1- a2
-IF(zi >= 0._RP)THEN
-   CACOS = ACOS(b) - CMPLX(0._RP,1._RP,RP)*LOG(a + SQRT(a*a - 1))
-ELSE
-   CACOS = ACOS(b) + CMPLX(0._RP,1._RP,RP)*LOG(a + SQRT(a*a - 1))
-ENDIF
-
-RETURN
-END FUNCTION CACOS
 !==============================================================================
 
-FUNCTION ASINH(x)
-!==============================================================================
-USE DATA_TYPE
-IMPLICIT NONE
-REAL(KIND=RP) :: ASINH
-REAL(KIND=RP) :: x
 
-ASINH = LOG(x+SQRT(x**2._RP+1))
-
-RETURN
-END FUNCTION ASINH
 !==============================================================================
 
-FUNCTION CSIN(z)
-!==============================================================================
-!! Complex sine (Jan's version)
 
-USE DATA_TYPE
-COMPLEX(KIND=RP) :: CSIN
-COMPLEX(KIND=RP) :: z
-
-CSIN =  (EXP( CMPLX(0._RP,1._RP,RP)*z) -EXP(-CMPLX(0._RP,1._RP,RP)*z)) &
-                            /CMPLX(0._RP,2._RP,RP)
-RETURN
-END FUNCTION CSIN
-!==============================================================================
-
-FUNCTION CTAN(z)
-!==============================================================================
-!! Complex TAN
-
-USE DATA_TYPE
-COMPLEX(KIND=RP) :: CTAN
-COMPLEX(KIND=RP) :: z
-
-CTAN =  -CMPLX(0._RP,1._RP,RP)*(EXP( CMPLX(0._RP,1._RP,RP)*z) -EXP(-CMPLX(0._RP,1._RP,RP)*z)) &
-                            /(EXP( CMPLX(0._RP,1._RP,RP)*z)+EXP(-CMPLX(0._RP,1._RP,RP)*z))
-RETURN
-END FUNCTION CTAN
 
 !==============================================================================
 function factorial (n) result (res)
@@ -2906,110 +2353,10 @@ RETURN
 END
 !=======================================================================
 
-SUBROUTINE CONVT(x,y,z,Nx,Ny,Nz)
-!!=======================================================================
-!!
-!! Time domain convolution
-!!
-USE RJMCMC_COM
-IMPLICIT NONE
-INTEGER(KIND=IB):: Nx,Ny,Nz
-INTEGER(KIND=IB):: irow,icol1,icol2,ix1,ix2
-REAL(KIND=RP)   :: x(Nx), y(Ny), z(Nz),xr(Nx)
-REAL(KIND=RP)   :: XMAT(Nz,Ny)
 
-XMAT = 0._RP
-xr = x(Nx:1:-1)
-DO irow=1,Nz
-  icol1 = MAX(1,irow-Nx+1)
-  icol2 = MIN(Ny,irow)
-  ix1   = MAX(1,Nx-irow+1)
-  ix2   = MIN(Nz-irow+1,Nx)
-  XMAT(irow,icol1:icol2) = xr(ix1:ix2)
-ENDDO
-
-z = MATMUL(XMAT,y)
-RETURN
-END SUBROUTINE CONVT
 !=======================================================================
 
-SUBROUTINE DCONVT(z,x,y,Nz,Nx,Ny)
-!!=======================================================================
-!!
-!! Time-domain deconvolution in matrix formulation:
-!!    If z=x*y is the  Nz=Nx+Ny-1 length 
-!!    convolution, compute y by deconvolving z 
-!!    by x. Considering the convolution via
-!!    matrix multiplication z=Xy, where X is an
-!!    Nz by Ny matrix, the deconvolution is 
-!!    carried out using Lapack DGELSS
-!!
-USE RJMCMC_COM
-IMPLICIT NONE
-INTEGER(KIND=IB):: Nx,Ny,Nz
-INTEGER(KIND=IB):: irow,icol1,icol2,ix1,ix2
-REAL(KIND=RP)   :: x(Nx), y(Ny), z(Nz),xr(Nx)
-REAL(KIND=RP)   :: XMAT(Nz,Ny)
-!! Lapack variables:
-INTEGER(KIND=IB)          :: MRANK, LWORK, INFO,LDA, LDB
-INTEGER(KIND=IB),PARAMETER:: LWMAX = 4000, NRHS = 1
 
-!! These are always double precision for DGELLS to work
-REAL(KIND=DRP)          :: SV(Ny),WORK(LWMAX)
-REAL(KIND=DRP)          :: XMAT2(Nz,Ny),b(NZ)
-REAL(KIND=DRP),PARAMETER:: RCOND = 1.e-12_DRP
-
-b = REAL(z,DRP)
-LDA = Nz
-LDB = Nz
-!!
-!! Build linear system of equations:
-XMAT = 0._RP
-xr = x(Nx:1:-1)
-DO irow=1,Nz
-  icol1 = MAX(1,irow-Nx+1)
-  icol2 = MIN(Ny,irow)
-  ix1   = MAX(1,Nx-irow+1)
-  ix2   = MIN(Nz-irow+1,Nx)
-  XMAT(irow,icol1:icol2) = xr(ix1:ix2)
-ENDDO
-
-!! In Matlab, can use Moore-Penrose pseudo inverse:
-!! y = pinv(X)*z;
-!! Here, use Lapack to solve LLS via SGELSS:
-!! SGELSS computes the minimum norm solution to a real linear least
-!! squares problem:
-!!
-!! Minimize 2-norm(| b - A*x |).
-!!
-!! using the singular value decomposition (SVD) of A. A is an M-by-N
-!! matrix which may be rank-deficient.
-!!
-!! Several right hand side vectors b and solution vectors x can be
-!! handled in a single call; they are stored as the columns of the
-!! M-by-NRHS right hand side matrix B and the N-by-NRHS solution matrix
-!! X.
-!!
-!! The effective rank of A is determined by treating as zero those
-!! singular values which are less than RCOND times the largest singular
-!! value.
-!! subroutine sgelss(integer M,integer N,integer NRHS,real, dimension( lda, * ) A,
-!!                   integer LDA,real, dimension( ldb, * ) B,integer LDB,
-!!                   real, dimension( * ) S,real RCOND,integer RANK,
-!!                   real, dimension( * ) WORK,integer LWORK,integer INFO )
-
-!! first, figure out optimal work length...
-XMAT2 = REAL(XMAT,DRP)
-LWORK = -1
-CALL DGELSS(Nz, Ny, NRHS, XMAT2, LDA, b, LDB, SV, RCOND, MRANK, WORK, LWORK, INFO)
-LWORK = MIN( LWMAX, INT( WORK( 1 ) ) )
-!! Carry out DGELSS with optimal length
-CALL DGELSS(Nz, Ny, NRHS, XMAT2, LDA, b, LDB, SV, RCOND, MRANK, WORK, LWORK, INFO)
-IF(INFO /= 0)WRITE(*,*)'WARNING DGELSS unstable!'
-
-y = REAL(b(1:Ny),RP)
-RETURN
-END SUBROUTINE DCONVT
 !=======================================================================
 ! This is the end my fiend...
 ! EOF
@@ -3023,8 +2370,8 @@ SUBROUTINE COPY_OBJ(objdst,objsrc)
 !! assignment frees and re-mallocs every allocatable component (gfortran),
 !! which invalidates the ABSOLUTE addresses frozen into the MPI struct
 !! types built by MAKE_MPI_STRUC_SP -> heap use-after-free in MPI_SEND.
-!! All components have fixed shapes set by ALLOC_OBJ (unconditionally, for
-!! every data type), so value assignment is always conforming.
+!! All components have fixed shapes set by ALLOC_OBJ (unconditionally), so
+!! value assignment is always conforming.
 !!
 USE DATA_TYPE
 USE RJMCMC_COM
@@ -3049,38 +2396,15 @@ objdst%voroidx     = objsrc%voroidx
 objdst%par         = objsrc%par
 objdst%hiface      = objsrc%hiface
 objdst%ziface      = objsrc%ziface
-objdst%sdparR      = objsrc%sdparR
-objdst%sdparV      = objsrc%sdparV
-objdst%sdparT      = objsrc%sdparT
 objdst%sdparSWD    = objsrc%sdparSWD
 objdst%sdparELL    = objsrc%sdparELL
-objdst%sdparMT     = objsrc%sdparMT
-objdst%sdaveH      = objsrc%sdaveH
-objdst%sdaveV      = objsrc%sdaveV
-objdst%sdaveT      = objsrc%sdaveT
 objdst%sdaveSWD    = objsrc%sdaveSWD
 objdst%sdaveELL    = objsrc%sdaveELL
-objdst%sdaveMT     = objsrc%sdaveMT
-objdst%arpar       = objsrc%arpar
 objdst%arparSWD    = objsrc%arparSWD
 objdst%arparELL    = objsrc%arparELL
-objdst%idxar       = objsrc%idxar
 objdst%idxarSWD    = objsrc%idxarSWD
 objdst%idxarELL    = objsrc%idxarELL
 objdst%gvoroidx    = objsrc%gvoroidx
-objdst%DobsR       = objsrc%DobsR
-objdst%DpredR      = objsrc%DpredR
-objdst%DobsV       = objsrc%DobsV
-objdst%DpredV      = objsrc%DpredV
-objdst%DobsT       = objsrc%DobsT
-objdst%DpredT      = objsrc%DpredT
-objdst%S           = objsrc%S
-objdst%DresR       = objsrc%DresR
-objdst%DresV       = objsrc%DresV
-objdst%DresT       = objsrc%DresT
-objdst%DarR        = objsrc%DarR
-objdst%DarV        = objsrc%DarV
-objdst%DarT        = objsrc%DarT
 objdst%DobsSWD     = objsrc%DobsSWD
 objdst%DpredSWD    = objsrc%DpredSWD
 objdst%DresSWD     = objsrc%DresSWD
@@ -3091,9 +2415,5 @@ objdst%DpredELL    = objsrc%DpredELL
 objdst%DresELL     = objsrc%DresELL
 objdst%DarELL      = objsrc%DarELL
 objdst%periods_ELL = objsrc%periods_ELL
-objdst%DobsMT      = objsrc%DobsMT
-objdst%DpredMT     = objsrc%DpredMT
-objdst%DresMT      = objsrc%DresMT
-objdst%freqMT      = objsrc%freqMT
 
 END SUBROUTINE COPY_OBJ

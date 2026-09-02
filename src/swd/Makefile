@@ -14,7 +14,7 @@ OBJS = dispersion.o lovmrx.o raymrx.o lovdsp.o raydsp.o four1.o
                   
 $(FO): ${MODS} ${OBJS}
 	ar urv libswd.a ${MODS} ${OBJS}
-	cp *.a ../obj/
+	mkdir -p ../obj; cp *.a ../obj/
 
 dispersion.o: dispersion.f90; $(FCSWD) -c dispersion.f90
 lovmrx.o: lovmrx.f; $(FCSWD) -c lovmrx.f

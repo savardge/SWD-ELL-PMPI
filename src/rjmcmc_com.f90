@@ -1,52 +1,40 @@
 !==============================================================================
 MODULE RJMCMC_COM
+!! Global module of the SWD-ELL trans-dimensional (rjMcMC) inversion.
+!! RF and MT machinery removed (SWD-ELL-PMPI); see git history for the
+!! original RF-SWD-ELL-MT code.
    USE MPI
    USE DATA_TYPE
    IMPLICIT NONE
-
 !!
 !! General switches
 !!
-   INTEGER(KIND=IB) :: IMAP       !! WRITE REPLICA AND EXIT
-   INTEGER(KIND=IB) :: ICOV       !! 0 = Sample implicit over sigma
-                                   !! 1 = Sample over sigma
-   INTEGER(KIND=IB) :: ICOV_SWD   !! 0 = Sample implicit over sigma
-   INTEGER(KIND=IB) :: ICOV_ELL   !! 0 = Sample implicit over sigma
-   INTEGER(KIND=IB) :: ICOV_MT    !! 0 = Sample implicit over sigma
-   INTEGER(KIND=IB) :: IMAGSCALE  !! 0 = turn off magnitude scale error
-   INTEGER(KIND=IB) :: ENOS       !! 1 = Turn on even numbered order stats
-   INTEGER(KIND=IB) :: IPOIPR     !! 1 = Turn on Poisson prior on k
-   INTEGER(KIND=IB) :: IAR        !! 1 = Use Autoregressive error model
-   INTEGER(KIND=IB) :: I_VARPAR   !! 1 = invert Radial and Vertical components
-   INTEGER(KIND=IB) :: IBD_SINGLE !! 1 = include BD for single parameters onto nodes
-   INTEGER(KIND=IB) :: I_RV       !! 1 = invert Radial and Vertical components
-   INTEGER(KIND=IB) :: I_T        !! 1 = invert Transverse component as well
+   INTEGER(KIND=IB) :: IMAP       !! 1 = predict data for the map_voro model and exit
+   INTEGER(KIND=IB) :: ICOV_SWD   !! SWD likelihood: 0 = implicit sigma, 1 = hierarchical sigma per curve, 2 = Cdi file, 3 = sd file
+   INTEGER(KIND=IB) :: ICOV_ELL   !! ELL likelihood: same coding
+   INTEGER(KIND=IB) :: IMAGSCALE  !! 1 = magnitude-scaled error model (SWD/ELL)
+   INTEGER(KIND=IB) :: ENOS       !! 1 = even-numbered order statistics prior on node depths
+   INTEGER(KIND=IB) :: IPOIPR     !! 1 = Poisson prior on k
+   INTEGER(KIND=IB) :: IAR        !! 1 = autoregressive error model
+   INTEGER(KIND=IB) :: I_VARPAR   !! 1 = variable layer complexity (trans-D)
+   INTEGER(KIND=IB) :: IBD_SINGLE !! 1 = birth/death for single parameters onto nodes
    INTEGER(KIND=IB) :: I_SWD      !! 1 = invert SWD data
    INTEGER(KIND=IB) :: I_ELL      !! 1 = invert ELL data
-   INTEGER(KIND=IB) :: I_MT       !! 1 = invert MT data
-   INTEGER(KIND=IB) :: I_ZMT      !! 1 = invert MT complex impedance tensor
-   INTEGER(KIND=IB) :: iraysum    !! 1 = invert use raysum 0 = use ray3d
-   INTEGER(KIND=IB) :: I_VREF     !! 1 = sample VpVs ratio
-   INTEGER(KIND=IB) :: I_VPVS     !! 1 = sample VpVs ratio
-   INTEGER(KIND=IB) :: ISMPPRIOR  !! Sample from the prior (sets logL = 1._RP)
-   INTEGER(KIND=IB) :: ISETSEED   !! Fix the random seed 
-   INTEGER(KIND=IB) :: IEXCHANGE  !! 1 = turn on exchange moves (parallel tempering)
-   INTEGER(KIND=IB) :: IDIP       !! 1 = allow dipping layers (dip and strike)
-   INTEGER(KIND=IB) :: ISD_RV     !! 1 = allow hiararchical sd
-   INTEGER(KIND=IB) :: ISD_SWD    !! 1 = allow hiararchical sd
-   INTEGER(KIND=IB) :: ISD_ELL    !! 1 = allow hiararchical sd
-   INTEGER(KIND=IB) :: ISD_MT     !! 1 = allow hiararchical sd
-   INTEGER(KIND=IB) :: ITAPER     !! 1 = taper pred data
+   INTEGER(KIND=IB) :: I_VREF     !! 1 = node velocities are perturbations around <base>_vel_ref.txt
+   INTEGER(KIND=IB) :: I_VPVS     !! 1 = sample Vp/Vs ratio (instead of Vp); -1 = fixed Vp/Vs = 1.75
+   INTEGER(KIND=IB) :: ISMPPRIOR  !! 1 = sample the prior (logL = const)
+   INTEGER(KIND=IB) :: ISETSEED   !! 1 = fixed random seed table
+   INTEGER(KIND=IB) :: IEXCHANGE  !! 1 = parallel-tempering exchange moves
+   INTEGER(KIND=IB),PARAMETER :: IDIP = 0     !! dipping layers were an RF-only feature (removed)
+   INTEGER(KIND=IB) :: ISD_SWD    !! 1 = sample hierarchical sigma of SWD curves
+   INTEGER(KIND=IB) :: ISD_ELL    !! 1 = sample hierarchical sigma of ELL curves
    INTEGER(KIND=IB) :: I_ABS_ELL  !! 1 = inverts abs of ellipticities
    INTEGER(KIND=IB) :: I_LOG10_ELL!! 1 = inverts log10 of absolute ellipticities
-   INTEGER(KIND=IB) :: IDECON     !! 0 = water-level with raysum, 1 = ITD with raysum
-
 !!
 !! Model and data dimensions
 !!
-   INTEGER(KIND=IB)            :: NDAT_MT      ! Number of MT data (apparent resistivities and phases)
-   INTEGER(KIND=IB)            :: NDAT_SWD     ! Number surface wave dispersion data (phases)
-   INTEGER(KIND=IB)            :: NMODE        ! Number surface wave dispersion modes
+   INTEGER(KIND=IB)            :: NDAT_SWD     ! Max number of SWD data per curve (array width)
+   INTEGER(KIND=IB)            :: NMODE        ! Number of SWD curves inverted jointly
    INTEGER(KIND=IB)            :: NDAT_ELL     ! Number ellipticity data
    INTEGER(KIND=IB)            :: NMODE_ELL    ! Number ellipticity modes
    !! ---- multimode SWD (multimode-raydsp branch) ----
@@ -54,52 +42,21 @@ MODULE RJMCMC_COM
    INTEGER(KIND=IB),ALLOCATABLE,DIMENSION(:) :: MODE_OF    !! Rayleigh mode number of each curve slot (keyword MODE_OF; default 0..NMODE-1)
    REAL(KIND=RP)    :: DVSCON   = -1._RP   !! max |adjacent-layer dVs| [km/s] indicator prior (keyword DVSCON; < 0 = off)
    INTEGER(KIND=IB) :: IGRP     = 0        !! 1 = group velocity, 0 = phase velocity (keyword IGRP)
-   REAL(KIND=RP)    :: SWD_CMIN = 2.0_RP   !! DISPER80 phase-speed scan window [km/s] (keyword SWD_SCAN cmin cmax dc)
+   REAL(KIND=RP)    :: SWD_CMIN = 2.0_RP   !! DISPER80 phase-speed scan window [km/s] (keyword SWD_SCAN cmin cmax dc [dc_over])
    REAL(KIND=RP)    :: SWD_CMAX = 6.5_RP   !!   defaults = the original crustal values of dispersion.f90
    REAL(KIND=RP)    :: SWD_DC   = 0.05_RP  !!   scan step [km/s] for the fundamental
-   REAL(KIND=RP)    :: SWD_DC_OVER = -1._RP !!   scan step for overtones (optional 4th SWD_SCAN value; < 0 = dc/5)
-   INTEGER(KIND=IB)            :: NTIME        ! Number time samples
-   INTEGER(KIND=IB)            :: NSRC         ! Number time samples in source-time function
-   INTEGER(KIND=IB)            :: NTIME2       ! Number time samples for zero padded observations
-   INTEGER(KIND=IB)            :: NRRG         ! No. points for convolution RRG
-   INTEGER(KIND=IB)            :: NRGRG        ! No. points for convolution RGRG
+   REAL(KIND=RP)    :: SWD_DC_OVER = -1._RP !!   scan step for overtones (< 0 = dc/5)
    INTEGER(KIND=IB)            :: NLMN         ! Min number of layers
    INTEGER(KIND=IB)            :: NLMX         ! Max number of layers
    INTEGER(KIND=IB)            :: NPL          ! No. parameters per layer
-
    CHARACTER(len=64) :: filebasefile      = 'filebase.txt'
-   INTEGER(KIND=IB)                 :: NRF1
-
-!! 
-!! Forward RF specific 
+!!
+!! Forward model parameter indexing (curmod columns: thick rho alpha beta ...)
 !!
   INTEGER(KIND=IB),ALLOCATABLE,DIMENSION(:):: idxpar
-  LOGICAL,ALLOCATABLE,DIMENSION(:)         :: isoflag
-  !!                                                      thick      rho      alph     beta    %P    %S    tr    pl    st    di
-  REAL(KIND=SP),DIMENSION(10),PARAMETER:: curmod_glob = (/10000._RP,2600._RP,6000._RP,3600._RP,0._RP,0._RP,0._RP,0._RP,0._RP,0._RP/)
-  INTEGER :: raysumfail = 0_IB
-  INTEGER :: NTR
-  REAL(KIND=SP),ALLOCATABLE,DIMENSION(:)       :: baz2,slow2,sta_dx,sta_dy
-  INTEGER(KIND=IB),ALLOCATABLE,DIMENSION(:)    :: nseg
-  INTEGER(KIND=IB),ALLOCATABLE,DIMENSION(:,:,:):: phaselist
-  REAL(KIND=SP),ALLOCATABLE,DIMENSION(:,:,:)   :: synth_cart,synth_ph
-  INTEGER(KIND=IB)          :: numph,iphase
-  INTEGER(KIND=IB)          :: mults  !! = 0  !! Parameter for multiples in layers
-  INTEGER(KIND=IB)          :: directs !!= 0  !! Parameter for directse  in layers !!!Pejman
-  INTEGER(KIND=IB),PARAMETER:: out_rot = 1  !! 
-  INTEGER(KIND=IB),PARAMETER:: align   = 1  !! 
-  REAL(KIND=SP)             :: shift2
-  REAL(KIND=SP)             :: sampling_dt
-  REAL(KIND=SP),PARAMETER   :: sig   = 0.01_SP
-  !REAL(KIND=SP),PARAMETER   :: VPVS  = 1.75_RP
-  REAL(KIND=SP)             :: width2             !! Set < 0 to return impulse response
-  REAL(KIND=SP)             :: wl                 !! water-level for ray3d
-  REAL(KIND=RP)             :: hmx                !! Max crustal depth in km
-  REAL(KIND=RP),DIMENSION(4):: sdmn               !! Min standard deviation
-  REAL(KIND=RP),DIMENSION(4):: sdmx               !! Max standard deviation
-  REAL(KIND=SP)             :: tolerance          !! for ITD
-  INTEGER(KIND=IB)          :: maxbumps, MAXG     !! for ITD
-  REAL(KIND=SP)             :: norm_ITD
+  REAL(KIND=RP)             :: hmx                !! Max partition depth in km
+  REAL(KIND=RP),DIMENSION(2):: sdmn               !! Min standard deviation (SWD, ELL)
+  REAL(KIND=RP),DIMENSION(2):: sdmx               !! Max standard deviation (SWD, ELL)
 !! 
 !! Forward gpell specific
 !!
@@ -111,8 +68,6 @@ MODULE RJMCMC_COM
   INTEGER(KIND=IB)      :: I_SET_COUNT_ELL
   INTEGER(KIND=IB)      :: COUNT_ELL  
   INTEGER(KIND=IB)      :: I_SET_RANGE_ELL
-!!
-
 !!
 !!  Prior variables and good seeding model
 !!
@@ -128,143 +83,85 @@ MODULE RJMCMC_COM
    REAL(KIND=RP),ALLOCATABLE,DIMENSION(:):: maxpert
    REAL(KIND=RP),ALLOCATABLE,DIMENSION(:):: pertsd
    REAL(KIND=RP),ALLOCATABLE,DIMENSION(:):: pertsdsc
-   REAL(KIND=RP)               :: vs01,vs02,vsh1,vsh2,numin,numax
-   REAL(KIND=RP)               :: area_bn,area_kskp,area_cr
-   REAL(KIND=RP)               :: sigmamin, sigmamax 
 !!
 !!  Autoregressive model prior variables:
 !!
-   REAL(KIND=RP)              :: armxH      = 0.2_RP           ! Max AR and ARI model range (amplitude units)
-   REAL(KIND=RP)              :: armxV      = 0.2_RP           ! Max AR and ARI model range (amplitude units)
-   REAL(KIND=RP)              :: armxSWD    = 0.5_RP           ! Max AR and ARI model range (amplitude units)
-   REAL(KIND=RP)              :: armxELL    = 0.5_RP           ! Max AR and ARI model range (amplitude units)
-   REAL(KIND=RP),ALLOCATABLE,DIMENSION(:):: minlimar, maxlimar, maxpertar
-   REAL(KIND=RP),ALLOCATABLE,DIMENSION(:):: pertarsd, pertarsdsc
+   REAL(KIND=RP)              :: armxSWD    = 0.5_RP           ! Max AR model range (SWD)
+   REAL(KIND=RP)              :: armxELL    = 0.5_RP           ! Max AR model range (ELL)
    REAL(KIND=RP),ALLOCATABLE,DIMENSION(:):: minlimarSWD, maxlimarSWD, maxpertarSWD
    REAL(KIND=RP),ALLOCATABLE,DIMENSION(:):: pertarsdSWD, pertarsdscSWD
    REAL(KIND=RP),ALLOCATABLE,DIMENSION(:):: minlimarELL, maxlimarELL, maxpertarELL
    REAL(KIND=RP),ALLOCATABLE,DIMENSION(:):: pertarsdELL, pertarsdscELL
-   !REAL(KIND=RP),ALLOCATABLE,DIMENSION(:):: minlimarMT, maxlimarMT, maxpertarMT
-   REAL(KIND=RP),ALLOCATABLE,DIMENSION(:):: pertarsdMT, pertarsdscMT
-   
 !!
 !!  Standard deviation prior variables:
 !!
-   REAL(KIND=RP),ALLOCATABLE,DIMENSION(:):: minlimsd, maxlimsd, maxpertsd
-   REAL(KIND=RP),ALLOCATABLE,DIMENSION(:):: pertsdsd, pertsdsdsc
    REAL(KIND=RP),ALLOCATABLE,DIMENSION(:):: minlimsdSWD, maxlimsdSWD, maxpertsdSWD
    REAL(KIND=RP),ALLOCATABLE,DIMENSION(:):: pertsdsdSWD, pertsdsdscSWD
    REAL(KIND=RP),ALLOCATABLE,DIMENSION(:):: minlimsdELL, maxlimsdELL, maxpertsdELL
    REAL(KIND=RP),ALLOCATABLE,DIMENSION(:):: pertsdsdELL, pertsdsdscELL
-   REAL(KIND=RP),ALLOCATABLE,DIMENSION(:):: minlimsdMT, maxlimsdMT, maxpertsdMT
-   REAL(KIND=RP),ALLOCATABLE,DIMENSION(:):: pertsdsdMT, pertsdsdscMT
-
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! MT Z measurement variance 
-   REAL(KIND=RP),ALLOCATABLE,DIMENSION(:):: MTZVAR 
    REAL(KIND=RP),ALLOCATABLE,DIMENSION(:,:):: sdSWD 
-   
-!   REAL(KIND=RP),DIMENSION(:),ALLOCATABLE:: fr,fstep   ! Total frequency array
-!   REAL(KIND=RP)               :: z_t
-!   REAL(KIND=RP)               :: cw
-!   REAL(KIND=RP)               :: rw
    CHARACTER(len=64) :: filebase
    INTEGER(KIND=IB)  :: filebaselen
-   CHARACTER(LEN=100) :: infileV
-   CHARACTER(LEN=100) :: infileR
-   CHARACTER(LEN=100) :: infileT
    CHARACTER(LEN=100) :: infileSWD
    CHARACTER(LEN=100) :: infile_sdSWD
    CHARACTER(LEN=100) :: infileELL
-   CHARACTER(LEN=100) :: infileMT
-   CHARACTER(LEN=100) :: infileMT_ZVAR  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
    CHARACTER(LEN=100) :: infileref
-   CHARACTER(LEN=100) :: infileCdi
    CHARACTER(LEN=100) :: infileCdiSWD
    CHARACTER(LEN=100) :: infileCdiELL
-   CHARACTER(LEN=100) :: infileCdiMT
-   CHARACTER(LEN=100) :: repfileR
-   CHARACTER(LEN=100) :: repfileT
-   CHARACTER(LEN=100) :: repfileV
-   CHARACTER(LEN=100) :: repfileS
-   CHARACTER(LEN=100) :: repfileRF
-   CHARACTER(LEN=100) :: repfileSWD
-   CHARACTER(LEN=100) :: repfileSWDar
-   CHARACTER(LEN=100) :: repfileELL
-   CHARACTER(LEN=100) :: repfileELLar
-   CHARACTER(LEN=100) :: repfileMT
-   CHARACTER(LEN=100) :: repfileMTar
    CHARACTER(LEN=100) :: parfile
    CHARACTER(LEN=64) :: logfile
    CHARACTER(LEN=64) :: seedfile
    CHARACTER(len=64) :: mapfile
-   CHARACTER(len=64) :: covfile
-   CHARACTER(LEN=64)  :: obsfile
-   CHARACTER(LEN=64)  :: arfile
-   CHARACTER(LEN=64)  :: predfile
    CHARACTER(LEN=64)  :: obsfileSWD
    CHARACTER(LEN=64)  :: arfileSWD
    CHARACTER(LEN=64)  :: predfileSWD
    CHARACTER(LEN=64)  :: obsfileELL
    CHARACTER(LEN=64)  :: arfileELL
    CHARACTER(LEN=64)  :: predfileELL
-   CHARACTER(LEN=64)  :: obsfileMT
-   CHARACTER(LEN=64)  :: arfileMT
-   CHARACTER(LEN=64)  :: predfileMT
    CHARACTER(len=64) :: sdfile
    CHARACTER(len=64) :: samplefile
    CHARACTER(len=64) :: stepsizefile
-   CHARACTER(len=64) :: lincovfile
-   CHARACTER(LEN=64)  :: modname = 'sample.geom'
-
 !!
 !! Velocity reference model
 !!
   INTEGER(KIND=IB)                        :: NVELREF, NPREM
   REAL(KIND=RP),ALLOCATABLE,DIMENSION(:,:):: vel_ref, vel_prem
 !!
-!! Iterative covariance estimate  parameters
+!! Iterative covariance estimate parameters (datasets: 1 = SWD, 2 = ELL)
 !!
    CHARACTER(len=64)                            :: samplefile_covIter
    CHARACTER(len=64)                            :: samplefile_res_covIter
    CHARACTER(LEN=100)                           :: covparfile
-   CHARACTER(LEN=100)                           :: infileCd
    CHARACTER(LEN=100)                           :: infileCdSWD
    CHARACTER(LEN=100)                           :: infileCdELL
-   CHARACTER(LEN=100)                           :: infileCdMT
    INTEGER(KIND=IB)                             :: usample_covIter, usample_res_covIter, units, unit2
    INTEGER(KIND=IB)                             :: ICOVest                          
-   INTEGER(KIND=IB)                             :: icovIter!!, covIter_nsamples
+   INTEGER(KIND=IB)                             :: icovIter
    INTEGER(KIND=IB)                             :: covIter_zero_nsamples, covITER_period, MAXcovIter
-   INTEGER(KIND=IB)                             :: ICOV_iterUpdate, ICOV_iterUpdate_RV, ICOV_iterUpdate_SWD, ICOV_iterUpdate_ELL, ICOV_iterUpdate_MT  
-   LOGICAL                                      :: cov_converged   !! assigned .TRUE./.FALSE. everywhere; was INTEGER (PGI accepted integer-as-logical)
-   INTEGER(KIND=IB)                             :: ISD_RV_covIter, ISD_SWD_covIter, ISD_ELL_covIter, ISD_MT_covIter
-   INTEGER(KIND=IB)                             :: CHAINTHIN_COVest_period_zeroIter, CHAINTHIN_COVest_period_nonzeroIter                               
-   INTEGER(KIND=IB)                             :: NRF2, NMODE2, NMODE_ELL2, NMT2, ncount3                                  
-   REAL(KIND=RP),DIMENSION(4)                   :: sdmn_covIter               
-   REAL(KIND=RP),DIMENSION(4)                   :: sdmx_covIter              
-   REAL(KIND=RP),DIMENSION(4)                   :: sdpar_covIter      
+   INTEGER(KIND=IB)                             :: ICOV_iterUpdate, ICOV_iterUpdate_SWD, ICOV_iterUpdate_ELL
+   LOGICAL                                      :: cov_converged
+   INTEGER(KIND=IB)                             :: ISD_SWD_covIter, ISD_ELL_covIter
+   INTEGER(KIND=IB)                             :: CHAINTHIN_COVest_period_zeroIter, CHAINTHIN_COVest_period_nonzeroIter
+   INTEGER(KIND=IB)                             :: NMODE2, NMODE_ELL2, ncount3                                  
+   REAL(KIND=RP),DIMENSION(2)                   :: sdmn_covIter               
+   REAL(KIND=RP),DIMENSION(2)                   :: sdmx_covIter              
+   REAL(KIND=RP),DIMENSION(2)                   :: sdpar_covIter      
    INTEGER(KIND=IB)                             :: NKEEP2, NKEEP_covIter, NKEEP3, NKEEP_covIter_res        
    INTEGER(KIND=IB)                             :: iSAVEsample_covIter, iSAVEsample_only_zeroIter
    INTEGER(KIND=IB)                             :: iMAP_calc           
-   REAL(KIND=RP),DIMENSION(:,:),ALLOCATABLE     :: Cd, Cd_old, Cdi_old      
    REAL(KIND=RP),DIMENSION(:,:),ALLOCATABLE     :: CdSWD, CdSWD_old, CdiSWD_old      
    REAL(KIND=RP),DIMENSION(:,:),ALLOCATABLE     :: CdELL, CdELL_old, CdiELL_old      
-   COMPLEX(KIND=RP),DIMENSION(:,:),ALLOCATABLE  :: CdMT, CdMT_old, CdiMT_old      
    REAL(KIND=RP),DIMENSION(:,:),ALLOCATABLE     :: sampleDres, sample2      
    INTEGER(KIND=IB)                             :: NsampleDres
-   INTEGER(KIND=IB)                             :: iconverge_criterion, iconverge_criterion_RV, iconverge_criterion_SWD, iconverge_criterion_ELL, iconverge_criterion_MT 
-   REAL(KIND=RP)                                :: converge_threshold_RV, converge_threshold_SWD, converge_threshold_ELL, converge_threshold_MT 
-   REAL(KIND=RP)                                :: covIter_errRV, covIter_errSWD, covIter_errELL, covIter_errMT 
-   INTEGER(KIND=IB), DIMENSION(4)               :: cov_converged_datasets
-   INTEGER(KIND=IB), DIMENSION(4)               :: ICOViter_datasets     
-   INTEGER(KIND=IB)                             :: nfrac_RV, MAX_NAVE_RV, inonstat_RV, iunbiased_RV, imr_RV
-   REAL(KIND=RP)                                :: damp_power_RV
+   INTEGER(KIND=IB)                             :: iconverge_criterion, iconverge_criterion_SWD, iconverge_criterion_ELL
+   REAL(KIND=RP)                                :: converge_threshold_SWD, converge_threshold_ELL
+   REAL(KIND=RP)                                :: covIter_errSWD, covIter_errELL
+   INTEGER(KIND=IB), DIMENSION(2)               :: cov_converged_datasets
+   INTEGER(KIND=IB), DIMENSION(2)               :: ICOViter_datasets     
    INTEGER(KIND=IB)                             :: nfrac_SWD, MAX_NAVE_SWD, inonstat_SWD, iunbiased_SWD, imr_SWD
    REAL(KIND=RP)                                :: damp_power_SWD
    INTEGER(KIND=IB)                             :: nfrac_ELL, MAX_NAVE_ELL, inonstat_ELL, iunbiased_ELL, imr_ELL
    REAL(KIND=RP)                                :: damp_power_ELL
-   INTEGER(KIND=IB)                             :: nfrac_MT, MAX_NAVE_MT, inonstat_MT, iunbiased_MT, imr_MT
-   REAL(KIND=RP)                                :: damp_power_MT
 !!
 !! Parallel Tempering parameters
 !!
@@ -278,7 +175,6 @@ MODULE RJMCMC_COM
   REAL(KIND=RP),ALLOCATABLE,DIMENSION(:)   :: beta_pt               !! Temperature array parallel tempering
   INTEGER(KIND=IB)                         :: ibirth  = 0,ideath  = 0
   INTEGER(KIND=IB)                         :: ibirths = 0,ideaths = 0
-
 !!
 !!  Sampling specific parameters
 !!
@@ -288,9 +184,8 @@ MODULE RJMCMC_COM
    INTEGER(KIND=IB)           :: ireject    = 0, iaccept = 0, iaccept_delay = 0, ireject_delay = 0
    INTEGER(KIND=IB)           :: i_bd,i_bds     ! Birth-Death track (0=MCMC, 1=birth, 2=death)
    INTEGER(KIND=IB)           :: i_sdpert = 0   ! if sigma is perturbed, don't compute forward model
-   INTEGER(KIND=IB)           :: ishearfail = 0 ! if sigma is perturbed, don't compute forward model
-   INTEGER(KIND=IB)           :: i_ref_nlay = 0 ! if sigma is perturbed, don't compute forward model
-
+   INTEGER(KIND=IB)           :: ishearfail = 0
+   INTEGER(KIND=IB)           :: i_ref_nlay = 0
 !!
 !!  Convergence parameters
 !!
@@ -298,7 +193,6 @@ MODULE RJMCMC_COM
    INTEGER(KIND=IB)       :: iconv2   = 0       ! Convergence switch master
    INTEGER(KIND=IB)       :: iconv3   = 0       ! Convergence switch master
    INTEGER(KIND=IB)       :: iarfail  = 0       ! Tracks failure of AR model when predicted AR series too large
-
 !!
 !! RJMCMC parameters
 !!
@@ -309,14 +203,13 @@ MODULE RJMCMC_COM
    INTEGER(KIND=IB),PARAMETER    :: NDM        = 100     ! No. steps in lin rot est
    INTEGER(KIND=IB)          :: TCHCKPT              !! No. seconds (integer value) between checkpoints
    INTEGER(KIND=IB)          :: icheckpoint          !! No. of checkpoints to data (read from checkpoint/status.txt)
-
    REAL(KIND=RP),ALLOCATABLE,DIMENSION(:,:)   :: sdevm  ! Std dev for perturbations
 !!
 !!  Structures for objects and data 
 !!
   INTEGER :: imcmc1 = 1   !! Counter for models at T=1 (needs to survive checkpointing!)
   INTEGER :: imcmc2 = 1   !! Counter for mcmc steps to scale diminishing adaptation (needs to survive checkpointing!)
-  INTEGER :: NFIELD = 62  !! The number of fields in objstruc
+  INTEGER :: NFIELD = 35  !! The number of fields in objstruc (SWD+ELL)
   INTEGER :: objtype1     !! Name of objtype for MPI sending
   INTEGER :: objtype2     !! Name of objtype for MPI sending
   INTEGER :: objtype3     !! Name of objtype for MPI sending
@@ -327,24 +220,14 @@ MODULE RJMCMC_COM
       REAL(KIND=RP),ALLOCATABLE,DIMENSION(:):: par     ! Forward parameters
       REAL(KIND=RP),ALLOCATABLE,DIMENSION(:):: hiface
       REAL(KIND=RP),ALLOCATABLE,DIMENSION(:):: ziface
-      REAL(KIND=RP),ALLOCATABLE,DIMENSION(:):: sdparR        !! Std dev Radial comp
-      REAL(KIND=RP),ALLOCATABLE,DIMENSION(:):: sdparV        !! Std dev Vertical comp
-      REAL(KIND=RP),ALLOCATABLE,DIMENSION(:):: sdparT        !! Std dev Vertical comp
-      REAL(KIND=RP),ALLOCATABLE,DIMENSION(:):: sdparSWD      !! Std dev SWD data
+      REAL(KIND=RP),ALLOCATABLE,DIMENSION(:):: sdparSWD      !! Std dev SWD data (one per curve)
       REAL(KIND=RP),ALLOCATABLE,DIMENSION(:):: sdparELL      !! Std dev ELL data
-      REAL(KIND=RP),ALLOCATABLE,DIMENSION(:):: sdparMT       !! Std dev MT data
-      REAL(KIND=RP),ALLOCATABLE,DIMENSION(:):: sdaveH        !! Std dev Radial comp
-      REAL(KIND=RP),ALLOCATABLE,DIMENSION(:):: sdaveV        !! Std dev Vertical comp
-      REAL(KIND=RP),ALLOCATABLE,DIMENSION(:):: sdaveT        !! Std dev Vertical comp
-      REAL(KIND=RP),ALLOCATABLE,DIMENSION(:):: sdaveSWD      !! Std dev SWD data
-      REAL(KIND=RP),ALLOCATABLE,DIMENSION(:):: sdaveELL      !! Std dev ELL data
-      REAL(KIND=RP),ALLOCATABLE,DIMENSION(:):: sdaveMT       !! Std dev MT data
-      REAL(KIND=RP),ALLOCATABLE,DIMENSION(:):: arpar         !! AR model forward parameters
-      REAL(KIND=RP),ALLOCATABLE,DIMENSION(:):: arparSWD      !! AR model forward parameters
-      REAL(KIND=RP),ALLOCATABLE,DIMENSION(:):: arparELL      !! AR model forward parameters
-      INTEGER(KIND=IB),ALLOCATABLE,DIMENSION(:):: idxar      !! AR on/off index (1=on)
-      INTEGER(KIND=IB),ALLOCATABLE,DIMENSION(:):: idxarSWD      !! AR on/off index (1=on)
-      INTEGER(KIND=IB),ALLOCATABLE,DIMENSION(:):: idxarELL      !! AR on/off index (1=on)
+      REAL(KIND=RP),ALLOCATABLE,DIMENSION(:):: sdaveSWD      !! Std dev SWD running average (AR discrimination)
+      REAL(KIND=RP),ALLOCATABLE,DIMENSION(:):: sdaveELL      !! Std dev ELL running average
+      REAL(KIND=RP),ALLOCATABLE,DIMENSION(:):: arparSWD      !! AR model parameters SWD
+      REAL(KIND=RP),ALLOCATABLE,DIMENSION(:):: arparELL      !! AR model parameters ELL
+      INTEGER(KIND=IB),ALLOCATABLE,DIMENSION(:):: idxarSWD   !! AR on/off index (1=on)
+      INTEGER(KIND=IB),ALLOCATABLE,DIMENSION(:):: idxarELL   !! AR on/off index (1=on)
       INTEGER(KIND=IB),ALLOCATABLE,DIMENSION(:):: gvoroidx   !! Index of live parameters on birth/death node
       INTEGER(KIND=IB)                        :: nunique     !! Number of unique interfaces
       INTEGER(KIND=IB)                        :: NFP         !! Number forward parameters
@@ -356,41 +239,18 @@ MODULE RJMCMC_COM
       INTEGER(KIND=IB)                        :: iaccept_bd = 0
       INTEGER(KIND=IB)                        :: ireject_bds = 0
       INTEGER(KIND=IB)                        :: iaccept_bds = 0
-      REAL(KIND=RP),ALLOCATABLE,DIMENSION(:,:):: DobsR       !! Observed data for one logL eval.
-      REAL(KIND=RP),ALLOCATABLE,DIMENSION(:,:):: DpredR      !! Predicted data for trial model
-      REAL(KIND=RP),ALLOCATABLE,DIMENSION(:,:):: DobsV       !! Observed data for one logL eval.
-      REAL(KIND=RP),ALLOCATABLE,DIMENSION(:,:):: DpredV      !! Predicted data for trial model
-      REAL(KIND=RP),ALLOCATABLE,DIMENSION(:,:):: DobsT       !! Observed data for one logL eval.
-      REAL(KIND=RP),ALLOCATABLE,DIMENSION(:,:):: DpredT      !! Predicted data for trial model
-      REAL(KIND=RP),ALLOCATABLE,DIMENSION(:,:):: S           !! Predicted data for trial model
-      REAL(KIND=RP),ALLOCATABLE,DIMENSION(:,:):: DresR       !! Data residuals for trial model
-      REAL(KIND=RP),ALLOCATABLE,DIMENSION(:,:):: DresV       !! Data residuals for trial model
-      REAL(KIND=RP),ALLOCATABLE,DIMENSION(:,:):: DresT       !! Data residuals for trial model
-      REAL(KIND=RP),ALLOCATABLE,DIMENSION(:,:):: DarR        !! Autoregressive model predicted data
-      REAL(KIND=RP),ALLOCATABLE,DIMENSION(:,:):: DarV        !! Autoregressive model predicted data
-      REAL(KIND=RP),ALLOCATABLE,DIMENSION(:,:):: DarT        !! Autoregressive model predicted data
       REAL(KIND=RP),ALLOCATABLE,DIMENSION(:,:):: DobsSWD     !! Observed data SWD
       REAL(KIND=RP),ALLOCATABLE,DIMENSION(:,:):: DpredSWD    !! Predicted SWD data for trial model
       REAL(KIND=RP),ALLOCATABLE,DIMENSION(:,:):: DresSWD     !! SWD data residuals for trial model
       REAL(KIND=RP),ALLOCATABLE,DIMENSION(:,:):: DarSWD      !! SWD autoregressive model predicted data
-      REAL(KIND=RP),ALLOCATABLE,DIMENSION(:,:):: periods     !! SWD autoregressive model predicted data
+      REAL(KIND=RP),ALLOCATABLE,DIMENSION(:,:):: periods     !! SWD periods (s) per curve
       REAL(KIND=RP),ALLOCATABLE,DIMENSION(:,:):: DobsELL     !! Observed data ELL
       REAL(KIND=RP),ALLOCATABLE,DIMENSION(:,:):: DpredELL    !! Predicted ELL data for trial model
       REAL(KIND=RP),ALLOCATABLE,DIMENSION(:,:):: DresELL     !! ELL data residuals for trial model
       REAL(KIND=RP),ALLOCATABLE,DIMENSION(:,:):: DarELL      !! ELL autoregressive model predicted data
-      REAL(KIND=RP),ALLOCATABLE,DIMENSION(:,:):: periods_ELL !! ELL autoregressive model predicted data
-      REAL(KIND=RP),ALLOCATABLE,DIMENSION(:)  :: DobsMT      !! Observed data MT
-      !REAL(KIND=RP),ALLOCATABLE,DIMENSION(:)  :: MTZVAR      !! Observed data MT impedance (Z) relative variances !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      REAL(KIND=RP),ALLOCATABLE,DIMENSION(:)  :: DpredMT     !! Predicted MT data for trial model
-      REAL(KIND=RP),ALLOCATABLE,DIMENSION(:)  :: DresMT      !! MT data residuals for trial model
-      REAL(KIND=RP),ALLOCATABLE,DIMENSION(:)  :: freqMT      !! MT data frequancy
+      REAL(KIND=RP),ALLOCATABLE,DIMENSION(:,:):: periods_ELL !! ELL periods (s) per curve
    END TYPE objstruc
-   REAL(KIND=RP),DIMENSION(:),ALLOCATABLE   :: taper_dpred    !! Taper for pred data
 
-!!!!!!!!!!!!!!Pejman: variables for making the training dataset for the nueral network
-REAL(KIND=RP), ALLOCATABLE, DIMENSION(:,:)   :: cur_modMT
-REAL(KIND=RP), ALLOCATABLE, DIMENSION(:,:)   :: cur_modSeismic
-!!!!!!!!!!!!!!
 
 !!
 !! Structure for covariance matrices (only applies for ICOV >= 2)
@@ -405,10 +265,8 @@ REAL(KIND=RP), ALLOCATABLE, DIMENSION(:,:)   :: cur_modSeismic
 !!
 !! Covariance matrices (only applies for ICOV >= 2)
 !!
-REAL(KIND=RP),DIMENSION(:,:),ALLOCATABLE :: Cdi     ! Inverse covariance matrix 
 REAL(KIND=RP),DIMENSION(:,:),ALLOCATABLE :: CdiSWD  ! Inverse covariance matrix SWD data
 REAL(KIND=RP),DIMENSION(:,:),ALLOCATABLE :: CdiELL  ! Inverse covariance matrix ELL data
-COMPLEX(KIND=RP),DIMENSION(:,:),ALLOCATABLE :: CdiMT  ! Inverse covariance matrix MT data
 !!
 
   INTEGER(KIND=IB) :: usample, ustep, ulog
@@ -416,11 +274,6 @@ COMPLEX(KIND=RP),DIMENSION(:,:),ALLOCATABLE :: CdiMT  ! Inverse covariance matri
 
    INTEGER(KIND=IB),DIMENSION(:),ALLOCATABLE      :: icount
 
-!!
-!!  Buffer for sdave for AR discrimination in CHECKBOUNDS_AR
-!!
-   INTEGER(KIND=IB), PARAMETER               :: NBUF = 100
-   REAL(KIND=RP),DIMENSION(:,:,:),ALLOCATABLE:: sdbuf
 !!
 !!  Global variables
 !!
@@ -449,10 +302,6 @@ COMPLEX(KIND=RP),DIMENSION(:,:),ALLOCATABLE :: CdiMT  ! Inverse covariance matri
    END INTERFACE
    REAL(KIND=RP) :: tsave1, tsave2              ! Overall time 
 
-!!
-!!  FFTW stuff
-!!
-   INTEGER*8 :: planR,planC
 
   CONTAINS
   !==============================================================================

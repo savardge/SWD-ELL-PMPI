@@ -1,2 +1,0 @@
-FC      = mpif90 -C -L/usr/lib -llapack -lblas
-#FC      = mpif90 -fc=pgfortran -L/usr/lib -llapack -lblas -fast -O4 -fastsse
