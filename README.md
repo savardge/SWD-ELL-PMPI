@@ -6,7 +6,9 @@ inversion of **surface-wave dispersion (SWD) and Rayleigh-wave ellipticity
 dispersion** (any set of mode branches, each on its own period grid) and an
 optional **adjacent-layer contrast constraint**.
 
-This is a fork of [pejman-sh86/RF-SWD-ELL-MT-PMPI](https://github.com/pejman-sh86/RF-SWD-ELL-MT-PMPI)
+Repository: [savardge/SWD-ELL-PMPI](https://github.com/savardge/SWD-ELL-PMPI)
+(renamed from RF-SWD-ELL-MT-PMPI), a fork of
+[pejman-sh86/RF-SWD-ELL-MT-PMPI](https://github.com/pejman-sh86/RF-SWD-ELL-MT-PMPI)
 (Jan Dettmer's rjMcMC code line). Branch `multimode-raydsp`:
 
 - the receiver-function (RF) and magnetotelluric (MT) machinery has been
@@ -27,7 +29,8 @@ validated to reproduce it bit-for-bit (see Validation).
 ## Build
 
 ```
-cd src
+git clone git@github.com:savardge/SWD-ELL-PMPI.git
+cd SWD-ELL-PMPI/src
 make            # gfortran/mpif90; LAPACK via -framework Accelerate (macOS)
 ```
 On Linux replace `LIB = -framework Accelerate` in `src/Makefile` by
