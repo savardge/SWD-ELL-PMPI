@@ -122,6 +122,8 @@ SWD_SCAN 0.08 1.6 0.005 0.001  DISPER80 root-scan window cmin cmax and step dc i
                                2.0 6.5 0.05 (crustal); near-surface work needs the
                                values shown (give dc_over explicitly for bit-reproducible
                                runs across builds)
+SWD_WARM 1                     warm-started root scan (see below): 1 on, 0 off,
+                               -1 (default) on iff DVSCON > 0
 ```
 
 The n-th Rayleigh mode is found by counting sign changes of the DISPER80
@@ -129,6 +131,50 @@ secular function along the c-scan (`swd/raydsp.f`, `RAYDSPN`). A model that
 cannot produce an observed mode at an observed period is rejected (dropping
 the point instead would let the likelihood reward vanishing modes). Each
 curve carries its own hierarchical sigma.
+
+### Warm-started root scan (speed)
+
+DISPER80 brackets a root by scanning phase velocity from `cmin` in steps of
+`dc` and counting sign changes, and the original code repeats that scan from
+`cmin` for every period and every mode: at the overtone step (dc = 1 m/s)
+about 850 propagator calls per period. Because a mode's phase velocity rises
+with period, the previous period's root is a lower bound for the next one, so
+the scan can start just below it (`SWD_WARM`, on by default when `DVSCON` is
+active):
+
+| | propagator calls | speed-up |
+|---|---|---|
+| fundamental | scan from cmin -> from the previous root | 2.3-3.2x |
+| overtones | " | 7.4-7.6x |
+
+The scan GRID is untouched (the start is the grid point `cmin + K*dc` below
+the bound), so an accepted warm scan returns the same bracket, and therefore a
+**bit-identical** root, as the cold scan. Three checks keep that true:
+
+1. **sign-parity certificate** (in `RAYDSPN`): the secular function changes
+   sign at every root, so the parity of `sign F(cstart)/sign F(cmin)` counts
+   the roots skipped. It must be the mode number; if it is not, the routine
+   reverts to the cold scan by itself, at the cost of one propagator call.
+2. **no crossing / implausible jump** (in `dispersion`): the period is redone
+   cold if the warm scan finds nothing above its start, or lands more than
+   `CWFWD` above the previous root.
+3. **monotonicity audit**: if the finished curve ever decreases with period --
+   the signature of a model whose roots move down faster than the warm window
+   -- the whole curve is recomputed cold.
+
+Limit: a strongly inverse-dispersive model (a fast lid over a slow channel)
+can move a root down past TWO roots at once, which parity cannot see. Such
+models only exist when the adjacent-layer contrast is unconstrained, so with
+`SWD_WARM -1` (the default) the warm start is enabled only when `DVSCON > 0`;
+`SWD_WARM 1` forces it on, `SWD_WARM 0` off.
+
+Validation (`swd/test_warm_driver.f90`, `tools/export_test_models.py`): warm
+and cold curves compared on 15 000 models drawn from the real HVC posteriors
+(v2 R0+R1+R2, v3 R0..R3, and the NLMX = 30 / hmin = 2 m run), all three modes
+-- **zero differing periods, zero differing validity patterns**. On 4 000
+models of the unconstrained fast-lid posterior the fundamental and first
+overtone are still exact and the second overtone differs at 0.2 % of periods,
+which is the regime the default switch excludes.
 
 ### Converting older inputs
 

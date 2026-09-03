@@ -1,4 +1,4 @@
-subroutine dispersion(nlyrs,rho,alpha,beta,thick,vel,peri,NTMAX,IGRP,ier,nmode_in,ivalid,cmin_in,cmax_in,dc_in,dc_over_in,iwarm_in)
+subroutine dispersion(nlyrs,rho,alpha,beta,thick,vel,peri,NTMAX,IGRP,ier,nmode_in,ivalid,cmin_in,cmax_in,dc_in,dc_over_in)
 ! C ----------------------------------------------------------------------
 ! C Hrvoje Tkalcic, February 25, 2005, LLNL
 ! C The only input file is model.0              
@@ -19,14 +19,13 @@ subroutine dispersion(nlyrs,rho,alpha,beta,thick,vel,peri,NTMAX,IGRP,ier,nmode_i
       include 'params.h'
       PARAMETER (NLMAX=50,NCUMAX=2)
 !C
-      INTEGER   nlyrs, ilay, idum1, itr, iper, NTMAX,ier,iwarm,ilast
+      INTEGER   nlyrs, ilay, idum1, itr, iper, NTMAX,ier
       REAL      alpha(nlyrs), beta(nlyrs),rho(nlyrs),&
                thick(nlyrs), smooth(nlyrs), beta_ap(nlyrs),&
                weight(nlyrs), cmin, cmax,& 
                dc, tol, pi2, w, ax(nlyrs), c(NTMAX), u(NTMAX), &
                vel(NTMAX), ekd, y0l(6),&
                vp(2*nlyrs), vs(2*nlyrs), z(2*nlyrs), za,&
-               cwarm, pwarm, cwback, cwfwd, clow,&
                y0r(3), yij(15), ap(nlyrs), ae(nlyrs), peri (NTMAX)
       CHARACTER*20 title
 !C
@@ -46,9 +45,6 @@ subroutine dispersion(nlyrs,rho,alpha,beta,thick,vel,peri,NTMAX,IGRP,ier,nmode_i
 !! defaults 2.0 6.5 0.05 = the original crustal values; near-surface work
 !! needs e.g. 0.08 1.6 0.005).
       REAL, INTENT(IN) :: cmin_in, cmax_in, dc_in, dc_over_in
-!! Warm-start switch: 1 = march the root from the previous period (fast),
-!! 0 = original cold scan from cmin at every period.  See the block below.
-      INTEGER, INTENT(IN) :: iwarm_in
 !C
       DATA      pi2/6.283185/, ia/0/
       cmin=cmin_in
@@ -93,41 +89,6 @@ IF (nmode_in > 0) dc = dc_over_in
 
 ivalid = 0
 
-!! ---------------------------------------------------------------------
-!! Warm-started root search (2026-09-02).
-!! DISPER80 finds the MODE-th root by scanning phase velocity from cmin in
-!! steps of dc and counting sign changes of the secular function; at the
-!! overtone step (dc = 0.001 km/s) that is ~850 propagator evaluations per
-!! period, and it is repeated from cmin for every period and every mode.
-!! Rayleigh phase velocity of a given mode increases with period, so when
-!! the periods are supplied in ASCENDING order the previous period's root is
-!! a lower bound for the current one: the scan then starts just below it
-!! instead of at cmin.  Measured on the HVC posteriors: 8-fold fewer
-!! propagator calls for the overtones, 3-fold for the fundamental.
-!!
-!! Exactness: the scan GRID is unchanged (the start is the grid point
-!! cmin + K*dc just below the bound), so the bracket -- and therefore the
-!! refined root -- are bit-identical to the cold scan whenever no root lies
-!! between cmin and the start. Two guards make that self-correcting:
-!!   (a) if no crossing is found above the warm start, and
-!!   (b) if the root found lies further than CWFWD above the previous one
-!!       (a jump that large means the warm bracket cannot be trusted),
-!! the period is recomputed with a full cold scan, which is authoritative.
-!! RAYDSPN adds a sign-parity certificate on the skipped interval, and the
-!! whole curve is recomputed cold if it is not monotone in period.
-!! LIMIT: strongly inverse-dispersive models (a fast lid over a slow
-!! channel) can move a root DOWN by more than the warm window and skip a
-!! PAIR of roots, which parity cannot see.  Such models only occur when the
-!! adjacent-layer contrast is unconstrained, so the caller switches the warm
-!! start off there (iwarm_in = 0); see LOGLHOOD_SWD.
-!! ---------------------------------------------------------------------
-iwarm  = iwarm_in    !! 1 = warm start allowed on this pass, 0 = cold pass
- 900 CONTINUE            !! re-entry point for the cold verification pass
-cwarm  = -1.
-pwarm  = -1.
-cwback = 10.*dc      !! safety margin below the previous root [km/s]
-cwfwd  = 0.30        !! max trusted rise in c between adjacent periods [km/s]
-
 DO iper=1,NTMAX
   w=pi2/peri(iper)
 ! CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC
@@ -158,24 +119,9 @@ DO iper=1,NTMAX
 
   c(iper) = 0.
   u(iper) = 0.
-  !! Warm start only when marching to a LONGER period (c increases); any
-  !! other ordering falls back to the cold scan.
-  clow = 0.
-  IF (iwarm == 1 .AND. cwarm > 0. .AND. peri(iper) > pwarm) clow = cwarm - cwback
   CALL raydspn(raymrx,thick,rho,alpha,beta,ap,ae,nlyrs,&
-               w,cmin,cmax,dc,tol,itr,ia,nmode_in,clow,c(iper),u(iper),&
+               w,cmin,cmax,dc,tol,itr,ia,nmode_in,c(iper),u(iper),&
                ekd,y0r,yij,ier)
-  IF (clow > 0.) THEN
-    !! Guards (a) and (b): recompute cold when the warm bracket is not
-    !! trustworthy. The cold result then replaces it unconditionally.
-    IF (ier /= 0 .OR. c(iper) > cwarm + cwfwd) THEN
-      c(iper) = 0.
-      u(iper) = 0.
-      CALL raydspn(raymrx,thick,rho,alpha,beta,ap,ae,nlyrs,&
-                   w,cmin,cmax,dc,tol,itr,ia,nmode_in,0.,c(iper),u(iper),&
-                   ekd,y0r,yij,ier)
-    ENDIF
-  ENDIF
   IF(ier < 0)THEN
     !! Hard input error: abort the whole call (ier propagates to the caller).
     ivalid(iper:NTMAX) = 0
@@ -187,8 +133,6 @@ DO iper=1,NTMAX
   !! but now resolved PER PERIOD instead of for the whole curve.
   IF(ier == 0)THEN
     ivalid(iper) = 1
-    cwarm = c(iper)
-    pwarm = peri(iper)
   ELSE
     ivalid(iper) = 0
   ENDIF
@@ -198,34 +142,6 @@ ENDDO
 !write (*,*) 'c',c
 !write (*,*) 'u',u
 !! JD
-!! ---------------------------------------------------------------------
-!! Monotonicity audit.  The warm start is exact while the mode's phase
-!! velocity increases with period, which is the normal case (and was true
-!! for every model of the constrained HVC posteriors: 7000 models, minimum
-!! step +0.5 m/s).  Strongly inverse-dispersive models -- e.g. a fast lid
-!! over a slow channel, which only exist when the adjacent-layer contrast
-!! is unconstrained -- can make c DECREASE with period by more than the
-!! warm window, and then the warm bracket may skip a pair of roots without
-!! tripping the parity certificate inside RAYDSPN.  Any decrease in the
-!! computed curve is that signature, so the whole curve is recomputed with
-!! cold scans, which are authoritative.  Only pathological models pay.
-!! ---------------------------------------------------------------------
-IF (iwarm == 1) THEN
-  ilast = 0
-  DO iper = 1,NTMAX
-    IF (ivalid(iper) == 1) THEN
-      IF (ilast > 0) THEN
-        IF (c(iper) < c(ilast) .AND. peri(iper) > peri(ilast)) THEN
-          iwarm = 0
-          ivalid = 0
-          GO TO 900
-        ENDIF
-      ENDIF
-      ilast = iper
-    ENDIF
-  ENDDO
-ENDIF
-
 !! Select either group (u) or phase (c) velocity
 ier = 0
 IF(IGRP == 1)THEN

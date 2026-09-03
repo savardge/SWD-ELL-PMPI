@@ -1,0 +1,3 @@
+include ../Makefile.compiler
+test_warm: libswd.a test_warm_driver.f90
+	$(FCSWD) -o test_warm test_warm_driver.f90 libswd.a

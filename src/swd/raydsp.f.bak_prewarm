@@ -2,7 +2,7 @@ C                                                                       RAY02740
 C     RAYLEIGH WAVE EIGENVALUE (R-K-G VERSION)                          RAY02750
 C                                                                       RAY02760
       SUBROUTINE  RAYDSPN(DIFFEQ,H,RHO,VP,VS,AP,AE,L,
-     *                   W,CMN,CMX,DC,TOL,ITR,IA,MODE,CLOW,C,U,EK,
+     *                   W,CMN,CMX,DC,TOL,ITR,IA,MODE,C,U,EK,
      1                   Y0,YIJ,IER)                                    RAY02790
 C                                                                       RAY02800
 C     INPUT                                                             RAY02810
@@ -16,16 +16,6 @@ C       AE   : ANISOTROPY FACTOR ETA                                    RAY02880
 C       L    : NUMBER OF LAYERS INCLUDING THE BOTTOM                    RAY02890
 C              HALF-SPACE                                               RAY02900
 C       W    : ANGULAR FREQUENCY                                        RAY02910
-C       CLOW : WARM-START LOWER BOUND ON THE PHASE VELOCITY OF THE       HVC00280
-C              REQUESTED MODE.  IF CLOW > CMN THE C-SCAN BEGINS AT       HVC00290
-C              THE LAST GRID POINT CMN+K*DC THAT IS <= CLOW AND THE      HVC00300
-C              FIRST SIGN CHANGE ABOVE IT IS TAKEN AS THE ROOT.          HVC00310
-C              THE SCAN GRID IS UNCHANGED, SO THE BRACKET AND HENCE      HVC00320
-C              THE REFINED ROOT ARE BIT-IDENTICAL TO THE COLD SCAN       HVC00330
-C              WHENEVER NO ROOT LIES IN (CMN, CLOW].  THAT CONDITION     HVC00340
-C              IS CHECKED BY A SIGN-PARITY TEST AND THE SCAN REVERTS     HVC00350
-C              TO COLD BY ITSELF WHEN IT FAILS, SO CLOW ONLY AFFECTS     HVC00360
-C              SPEED, NEVER THE RESULT.  CLOW <= CMN = COLD SCAN.        HVC00365
 C       CMN  : LOWER LIMIT OF PHASE VELOCITY                            RAY02920
 C       CMX  : UPPER LIMIT OF PHASE VELOCITY                            RAY02930
 C       DC   : INCREMENT   OF PHASE VELOCITY                            RAY02940
@@ -65,7 +55,6 @@ C     REVISED   25/IX/85                                                RAY03210
 C                                                                       RAY03220
       DIMENSION  H(L),RHO(L),VP(L),VS(L),AP(L),AE(L),                   RAY03230
      *           Y0(3),YIJ(15)                                          RAY03240
-      INTEGER    KS,MODEL,IPAR                                          HVC00520
 C                                                                       RAY03250
 C     INITIALIZATION                                                    RAY03260
 C                                                                       RAY03270
@@ -87,13 +76,7 @@ C     WRITE(6,3)  W                                                     RAY03420
     3   FORMAT(/7X,'W',15X,'RAYLEIGH WAVE'/                             RAY03430
      *         1PE18.6//7X,'C',17X,'Y2',16X,'Y3')                       RAY03440
 C    *         1PD18.6//7X,'C',17X,'Y2',16X,'Y3')                       RAY03450
-C                                                                       HVC00370
-C     WARM START.  KS IS THE GRID INDEX OF THE FIRST SCAN POINT;         HVC00380
-C     KS=0 REPRODUCES THE ORIGINAL COLD SCAN EXACTLY.  WHEN WARM         HVC00390
-C     STARTED WE LOOK FOR THE FIRST CROSSING ABOVE THE START, SO         HVC00400
-C     THE LOCAL MODE COUNTER MODEL IS ZERO.                             HVC00410
-C                                                                       HVC00420
-      C3 = CMN                                                          HVC00430
+      C3 = CMN                                                          RAY03460
       IF( C3.LE.0 )  GO TO  92                                          RAY03470
       CALL  DIFFEQ(H,RHO,VP,VS,AP,AE,L,W,C3,IA,1,U,                     RAY03480
      *             EK,Y0,YIJ,IER)                                       RAY03490
@@ -104,49 +87,13 @@ C     WRITE(6,4)  C3,F3,Y0(3)                                           RAY03520
 C   4   FORMAT(1P3D18.6)                                                RAY03540
       NCROSS = 0                                                        HVC00070
       IF( F3.EQ.0 )  NCROSS = 1                                         HVC00080
-C                                                                       HVC00530
-C     WARM START WITH A SIGN-PARITY CERTIFICATE.                        HVC00540
-C     KS IS THE GRID INDEX OF THE FIRST SCAN POINT; KS=0 IS THE          HVC00550
-C     ORIGINAL COLD SCAN.  THE SECULAR FUNCTION CHANGES SIGN AT EVERY    HVC00560
-C     ROOT, SO THE NUMBER OF ROOTS IN (CMN,CSTART) HAS THE PARITY OF     HVC00570
-C     SIGN(F(CSTART))/SIGN(F(CMN)).  IT MUST BE MODE (THE MODES BELOW    HVC00580
-C     THE REQUESTED ONE).  IF THE PARITY DISAGREES THE WARM BRACKET      HVC00590
-C     HAS SKIPPED A ROOT AND WE FALL BACK TO THE COLD SCAN, WHICH        HVC00600
-C     COSTS ONE EXTRA PROPAGATOR CALL.  BECAUSE THE SCAN GRID IS         HVC00610
-C     UNCHANGED, AN ACCEPTED WARM SCAN RETURNS THE SAME BRACKET -- AND   HVC00620
-C     HENCE BIT-IDENTICAL ROOT -- AS THE COLD SCAN.                      HVC00630
-C                                                                       HVC00640
-      F0 = F3                                                           HVC00650
-      KS = 0                                                            HVC00660
-      MODEL = MODE                                                      HVC00670
-      IF( CLOW.GT.CMN .AND. DC.GT.0 .AND. F0.NE.0 )  THEN               HVC00680
-        KS = (CLOW - CMN)/DC                                            HVC00690
-        KS = MAX(0,KS)                                                  HVC00700
-        IF( KS.GT.0 )  THEN                                             HVC00710
-          CW = CMN + KS*DC                                              HVC00720
-          CALL  DIFFEQ(H,RHO,VP,VS,AP,AE,L,W,CW,IA,1,U,                 HVC00730
-     *                 EK,Y0,YIJ,IER)                                   HVC00740
-          IF( IER.NE.0 )  RETURN                                        HVC00750
-          FW = Y0(2)                                                    HVC00760
-          IPAR = 1                                                      HVC00770
-          IF( MOD(MODE,2).EQ.1 )  IPAR = -1                             HVC00780
-          IF( FW.NE.0 .AND. FW*SIGN(ONE,F0)*IPAR.GT.0 )  THEN           HVC00790
-            C3     = CW                                                 HVC00800
-            F3     = FW                                                 HVC00810
-            MODEL  = 0                                                  HVC00820
-            NCROSS = 0                                                  HVC00830
-          ELSE                                                          HVC00840
-            KS = 0                                                      HVC00850
-          END IF                                                        HVC00860
-        END IF                                                          HVC00870
-      END IF                                                            HVC00880
-      IF( F3.EQ.0 .AND. TOL1.GT.0 .AND. MODEL.LE.0 )  GO TO  9          HVC00090
+      IF( F3.EQ.0 .AND. TOL1.GT.0 .AND. MODE.LE.0 )  GO TO  9           HVC00090
 C                                                                       RAY03560
 C     FIND A ZERO-CROSS                                                 RAY03570
 C                                                                       RAY03580
       KX = (CMX - CMN)/DC + 0.5                                         RAY03590
       KX = MAX(1,KX)                                                    RAY03600
-      DO  5  K=KS+1,KX                                                  HVC00510
+      DO  5  K=1,KX                                                     RAY03610
         CC = CMN + K*DC                                                 RAY03620
         C1 = C3                                                         RAY03630
         F1 = F3                                                         RAY03640
@@ -160,7 +107,7 @@ C       WRITE(6,4)  C3,F3,Y0(3)                                         RAY03710
         IF(  TOL1.LE.0 )  GO TO  5                                      RAY03720
         IF( F3*SIGN(ONE,F1).GT.0 )  GO TO  5                            HVC00100
         NCROSS = NCROSS + 1                                             HVC00110
-        IF( NCROSS.GT.MODEL )  GO TO  6                                 HVC00120
+        IF( NCROSS.GT.MODE )  GO TO  6                                  HVC00120
     5 CONTINUE                                                          RAY03740
 C                                                                       RAY03750
       IER = 2                                                           RAY03760
@@ -294,7 +241,7 @@ C                                                                       HVC00160
      *           Y0(3),YIJ(15)                                           HVC00210
       EXTERNAL   DIFFEQ                                                  HVC00220
       CALL  RAYDSPN(DIFFEQ,H,RHO,VP,VS,AP,AE,L,                          HVC00230
-     *              W,CMN,CMX,DC,TOL,ITR,IA,0,0.0,C,U,EK,                HVC00240
+     *              W,CMN,CMX,DC,TOL,ITR,IA,0,C,U,EK,                    HVC00240
      1              Y0,YIJ,IER)                                          HVC00250
       RETURN                                                             HVC00260
       END                                                                HVC00270

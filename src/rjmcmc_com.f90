@@ -46,6 +46,8 @@ MODULE RJMCMC_COM
    REAL(KIND=RP)    :: SWD_CMAX = 6.5_RP   !!   defaults = the original crustal values of dispersion.f90
    REAL(KIND=RP)    :: SWD_DC   = 0.05_RP  !!   scan step [km/s] for the fundamental
    REAL(KIND=RP)    :: SWD_DC_OVER = -1._RP !!   scan step for overtones (< 0 = dc/5)
+   INTEGER(KIND=IB) :: SWD_WARM = -1     !! warm-started root scan (keyword SWD_WARM):
+                                          !! 1 = on, 0 = off, -1 = auto (on iff DVSCON > 0)
    INTEGER(KIND=IB)            :: NLMN         ! Min number of layers
    INTEGER(KIND=IB)            :: NLMX         ! Max number of layers
    INTEGER(KIND=IB)            :: NPL          ! No. parameters per layer

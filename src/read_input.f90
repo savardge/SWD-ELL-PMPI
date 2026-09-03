@@ -87,6 +87,11 @@ READ(20,*) I_SET_RANGE_ELL !! 48
 !!                        Absent = 0 1 ... NMODE-1.  E.g. "MODE_OF 0 2" fits
 !!                        the fundamental + second higher mode with no R1.
 !!   IGRP    0|1          0 = phase velocity (default), 1 = group velocity.
+!!   SWD_WARM 0|1|-1      warm-started root scan: march each mode's root from
+!!                        the previous period instead of rescanning from cmin
+!!                        (3-8x fewer propagator calls). -1 (default) enables
+!!                        it only when DVSCON > 0, the regime where it is
+!!                        exact; 1 forces it on, 0 off.
 !!   SWD_SCAN cmin cmax dc [dc_over]  DISPER80 root-scan window and step in
 !!                        km/s. Default 2.0 6.5 0.05 (crustal); near-surface
 !!                        work needs e.g. 0.08 1.6 0.005. Overtones scan at
@@ -119,6 +124,8 @@ DO
       WRITE(6,*) 'ERROR: MODE_OF needs NMODE =',NMODE,' integers: ',TRIM(kwline)
       STOP
     ENDIF
+  CASE ('SWD_WARM')
+    READ(kwline(ipos:),*,IOSTAT=io_kw) SWD_WARM
   CASE ('IGRP')
     READ(kwline(ipos:),*,IOSTAT=io_kw) IGRP
   CASE ('SWD_SCAN')
@@ -381,6 +388,7 @@ IMPLICIT NONE
   WRITE(6,*) 'MODE_OF    = ', MODE_OF
   WRITE(6,*) 'IGRP       = ', IGRP
   WRITE(6,*) 'SWD_SCAN   = ', SWD_CMIN, SWD_CMAX, SWD_DC, SWD_DC_OVER
+  WRITE(6,*) 'SWD_WARM   = ', SWD_WARM
   IF (icovIter==0_IB) WRITE(6,*) 'Done reading parameter file.'
   WRITE(6,*) ''
   WRITE(6,*) ' ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~  '
