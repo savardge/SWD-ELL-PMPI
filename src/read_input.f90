@@ -81,6 +81,13 @@ READ(20,*) I_SET_RANGE_ELL !! 48
 !!   DVSCON  x            max |adjacent-layer dVs| in km/s, indicator prior
 !!                        checked before the forward (Kennett 2023/2026;
 !!                        BayHunter lvz/hvz parity). Absent or < 0 = off.
+!!   DVSMONO x            max ALLOWED adjacent-layer Vs DECREASE with depth in
+!!                        km/s (one-sided DVSCON). 0 = strictly non-decreasing;
+!!                        a small tolerance (e.g. 0.05) admits the metre-scale
+!!                        softening real boring logs show while excluding a
+!!                        fast lid over a much slower layer. Absent or < 0 =
+!!                        off. Also enables the warm-started root scan, which
+!!                        is exact when no low-velocity zone can exist.
 !!   MODE_OF m1 m2 ...    Rayleigh mode number of each SWD curve slot (NMODE
 !!                        ascending integers >= 0). Slot files are named by
 !!                        mode: <base>_SWD.dat (mode 0), <base>_SWD_M<m>.dat.
@@ -118,6 +125,8 @@ DO
   SELECT CASE (TRIM(kw))
   CASE ('DVSCON')
     READ(kwline(ipos:),*,IOSTAT=io_kw) DVSCON
+  CASE ('DVSMONO')
+    READ(kwline(ipos:),*,IOSTAT=io_kw) DVSMONO
   CASE ('MODE_OF')
     READ(kwline(ipos:),*,IOSTAT=io_kw) MODE_OF
     IF(io_kw /= 0)THEN
@@ -385,6 +394,7 @@ IMPLICIT NONE
   !WRITE(6,*) 'Done reading data.'
   WRITE(6,*) '--- multimode SWD keywords ---'
   WRITE(6,*) 'DVSCON     = ', DVSCON
+  WRITE(6,*) 'DVSMONO    = ', DVSMONO
   WRITE(6,*) 'MODE_OF    = ', MODE_OF
   WRITE(6,*) 'IGRP       = ', IGRP
   WRITE(6,*) 'SWD_SCAN   = ', SWD_CMIN, SWD_CMAX, SWD_DC, SWD_DC_OVER
@@ -475,21 +485,50 @@ IF(I_SWD == 1)THEN
     ENDDO
     CLOSE(30)
   ELSEIF (ICOV_SWD == 3) THEN
+    !!
+    !! Per-point standard deviations, ONE FILE PER CURVE SLOT, named like the
+    !! data files: mode 0 -> <base>_sdSWD.dat, mode m -> <base>_sdSWD_M<m>.dat.
+    !! Each must hold exactly NDAT_MODE(imode) rows (same order as the data).
+    !! The likelihood divides by sdSWD, so a missing or short file is FATAL
+    !! here rather than a silent zero (which would make every logL NaN and
+    !! reject every model without any message).
+    !!
     ALLOCATE(sdSWD(NMODE,NDAT_SWD))
     sdSWD = 0._RP
-    OPEN(20,FILE=infile_sdSWD,FORM='formatted',STATUS='OLD',ACTION='READ')
-    DO idat=1,NDAT_SWD
-       READ(20,*,IOSTAT=io) sdSWD(1,idat)
-       IF (io > 0) THEN
-         STOP "Check input.  Something was wrong"
-       ELSEIF (io < 0) THEN
-         EXIT
-       ELSE
-       !  ndatad=ndatad+1
-       ENDIF
-       !if (i==ndatadmax) stop "number of Dispersion data >= ndatadmax"
+    DO imode = 1,NMODE
+      IF(MODE_OF(imode) == 0)THEN
+        swdfile = infile_sdSWD
+      ELSE
+        WRITE(modestr,'(I0)') MODE_OF(imode)
+        swdfile = filebase(1:filebaselen) // '_sdSWD_M' // TRIM(modestr) // '.dat'
+      ENDIF
+      OPEN(20,FILE=swdfile,FORM='formatted',STATUS='OLD',ACTION='READ',IOSTAT=io)
+      IF(io /= 0)THEN
+        WRITE(6,*) 'ERROR: ICOV_SWD=3 but cannot open sd file for mode ',MODE_OF(imode),': ',TRIM(swdfile)
+        STOP
+      ENDIF
+      nswd_m = 0
+      DO idat=1,NDAT_SWD
+         READ(20,*,IOSTAT=io) sdSWD(imode,idat)
+         IF (io > 0) THEN
+           STOP "Check input.  Something was wrong"
+         ELSEIF (io < 0) THEN
+           EXIT
+         ELSE
+           nswd_m = nswd_m + 1
+         ENDIF
+      ENDDO
+      CLOSE(20)
+      IF(nswd_m /= NDAT_MODE(imode))THEN
+        WRITE(6,*) 'ERROR: sd file ',TRIM(swdfile),' has ',nswd_m,' rows but the data file has ',NDAT_MODE(imode)
+        STOP
+      ENDIF
+      IF(ANY(sdSWD(imode,1:nswd_m) <= 0._RP))THEN
+        WRITE(6,*) 'ERROR: non-positive sd in ',TRIM(swdfile)
+        STOP
+      ENDIF
+      WRITE(6,*) 'SWD sd  mode ',MODE_OF(imode),':',nswd_m,' points from ',TRIM(swdfile)
     ENDDO
-    CLOSE(20)
   ENDIF!!ICOV_SWD
 ENDIF
 IF(I_ELL == 1)THEN

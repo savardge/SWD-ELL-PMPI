@@ -52,6 +52,7 @@ mpirun -np 12 ../../src/bin/prjmh_temper_rf
 | `<base>_covparameter.dat` | 35 lines: iterative covariance-estimation settings (SWD, ELL); set `ICOVest 0` and `Icov_iterUpdate_* 0` for a plain rjMcMC run |
 | `<base>_SWD.dat` | fundamental-mode curve: `period(s) phase_velocity(km/s)`, ascending period |
 | `<base>_SWD_M<m>.dat` | higher-mode curves, one per mode number `m` listed in `MODE_OF` |
+| `<base>_sdSWD.dat`, `<base>_sdSWD_M<m>.dat` | `ICOV_SWD = 3` only: per-point standard deviations (km/s), one file per curve slot named like the data files, same row order and count as the data file. The likelihood divides residuals by these AND by the curve's sampled `sdparSWD`, so `sdparSWD` becomes a dimensionless scale (set `sdmn`/`sdmx` accordingly, or `ISD_SWD = 0` to fix it at the `map_voro` value, typically 1). A missing or short file, or a non-positive sd, is fatal at read time (2026-09-08; the earlier build read mode slot 1 only and left other slots at zero) |
 | `<base>_ELL.dat` | ellipticity data (if `I_ELL = 1`) |
 | `<base>_vel_ref.txt` | reference Vs model when `I_VREF = 1` (node velocities are perturbations around it) |
 | `<base>_map_voro.dat` | starting model: `k`, `NLMX*NPL` node triplets (depth km, dVs, dVpVs; unused slots 0), `sdparSWD(NMODE)`, `sdparELL(NMODE_ELL)`, `arparSWD(NMODE)`, `arparELL(NMODE_ELL)` |
@@ -112,6 +113,12 @@ Trailing lines that are not keywords are ignored.
 DVSCON   0.100                 max |adjacent-layer dVs| in km/s: indicator prior evaluated
                                on the final layer stack BEFORE the forward call (Kennett
                                2023/2026 Seismica; BayHunter lvz/hvz parity). Absent/<0 = off
+DVSMONO  0.050                 one-sided DVSCON: max ALLOWED adjacent-layer Vs DECREASE with
+                               depth in km/s. 0 = strictly non-decreasing; a small tolerance
+                               admits the metre-scale softening real boring logs show while
+                               excluding a fast lid over a much slower layer. Same indicator
+                               prior, checked before the forward. Absent/<0 = off. Also
+                               enables the warm start (no LVZ can exist, so it is exact)
 MODE_OF  0 2                   Rayleigh mode number of each curve slot (NMODE ascending
                                integers). Files are named by mode (_SWD.dat, _SWD_M2.dat);
                                "0 2" fits the fundamental + second higher mode with no R1.
@@ -123,7 +130,7 @@ SWD_SCAN 0.08 1.6 0.005 0.001  DISPER80 root-scan window cmin cmax and step dc i
                                values shown (give dc_over explicitly for bit-reproducible
                                runs across builds)
 SWD_WARM 1                     warm-started root scan (see below): 1 on, 0 off,
-                               -1 (default) on iff DVSCON > 0
+                               -1 (default) on iff DVSCON > 0 or DVSMONO >= 0
 ```
 
 The n-th Rayleigh mode is found by counting sign changes of the DISPER80
@@ -165,7 +172,8 @@ the bound), so an accepted warm scan returns the same bracket, and therefore a
 Limit: a strongly inverse-dispersive model (a fast lid over a slow channel)
 can move a root down past TWO roots at once, which parity cannot see. Such
 models only exist when the adjacent-layer contrast is unconstrained, so with
-`SWD_WARM -1` (the default) the warm start is enabled only when `DVSCON > 0`;
+`SWD_WARM -1` (the default) the warm start is enabled only when `DVSCON > 0`
+or `DVSMONO >= 0` (a monotonic profile cannot have a channel at all);
 `SWD_WARM 1` forces it on, `SWD_WARM 0` off.
 
 Validation (`swd/test_warm_driver.f90`, `tools/export_test_models.py`): warm

@@ -156,6 +156,23 @@ IF(DVSCON > 0._RP)THEN
 ENDIF
 
 !!
+!! One-sided version of the same indicator prior: forbid a Vs DECREASE with
+!! depth larger than DVSMONO. DVSMONO = 0 is strict monotonicity; a small
+!! tolerance admits the metre-scale softening real logs show (NYPA Crest-2
+!! drops 180 -> 155 m/s across the lake-bed clay) while still excluding a
+!! fast lid over a much slower layer. Like DVSCON it is checked on the final
+!! layer stack BEFORE the forward, so rejected proposals cost nothing.
+!!
+IF(DVSMONO >= 0._RP)THEN
+  DO ilay = 1,obj%nunique
+    IF(curmod2(ilay,4)-curmod2(ilay+1,4) > DVSMONO*1000._RP)THEN
+      logL = -HUGE(1._RP)
+      RETURN
+    ENDIF
+  ENDDO
+ENDIF
+
+!!
 !! Forward-model every curve slot on its OWN period grid and point count, as
 !! the Rayleigh mode MODE_OF(imode) (0 = fundamental; RAYDSPN counts roots).
 !!
@@ -171,6 +188,9 @@ iwarm = SWD_WARM
 IF(iwarm < 0)THEN
   iwarm = 0
   IF(DVSCON > 0._RP) iwarm = 1
+  !! DVSMONO forbids low-velocity zones outright, a stronger guarantee than
+  !! DVSCON that c(T) rises with period, so the warm start is exact there too
+  IF(DVSMONO >= 0._RP) iwarm = 1
 ENDIF
 DO imode = 1,NMODE
   nswd_m = NDAT_MODE(imode)

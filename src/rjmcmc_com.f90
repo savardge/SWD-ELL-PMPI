@@ -41,6 +41,7 @@ MODULE RJMCMC_COM
    INTEGER(KIND=IB),ALLOCATABLE,DIMENSION(:) :: NDAT_MODE  !! actual no. of data per SWD curve slot (NDAT_SWD = max)
    INTEGER(KIND=IB),ALLOCATABLE,DIMENSION(:) :: MODE_OF    !! Rayleigh mode number of each curve slot (keyword MODE_OF; default 0..NMODE-1)
    REAL(KIND=RP)    :: DVSCON   = -1._RP   !! max |adjacent-layer dVs| [km/s] indicator prior (keyword DVSCON; < 0 = off)
+   REAL(KIND=RP)    :: DVSMONO  = -1._RP   !! max ALLOWED adjacent-layer Vs DECREASE with depth [km/s] (keyword DVSMONO; < 0 = off)
    INTEGER(KIND=IB) :: IGRP     = 0        !! 1 = group velocity, 0 = phase velocity (keyword IGRP)
    REAL(KIND=RP)    :: SWD_CMIN = 2.0_RP   !! DISPER80 phase-speed scan window [km/s] (keyword SWD_SCAN cmin cmax dc [dc_over])
    REAL(KIND=RP)    :: SWD_CMAX = 6.5_RP   !!   defaults = the original crustal values of dispersion.f90
