@@ -69,9 +69,11 @@ INTEGER(KIND=IB)                      :: ipred,ierr_swd,imod,ibadlogL,ilay
 TYPE (objstruc)                       :: obj
 REAL(KIND=SP),DIMENSION(maxlay,10)    :: curmod
 REAL(KIND=SP),DIMENSION(maxlay+NPREM,10):: curmod2
-REAL(KIND=SP),DIMENSION(NDAT_SWD)     :: periods,DpredSWD
+REAL(KIND=SP),DIMENSION(NDAT_SWD)     :: periods,DpredSWD,UpredSWD
 INTEGER(KIND=IB),DIMENSION(NDAT_SWD)  :: ivalidSWD
-INTEGER(KIND=IB)                      :: imode,nswd_m
+REAL(KIND=SP),DIMENSION(NMODE,NDAT_SWD)    :: cbuf,ubuf   !! phase / group velocity per slot
+INTEGER(KIND=IB),DIMENSION(NMODE,NDAT_SWD) :: ivbuf       !! per-period validity per slot
+INTEGER(KIND=IB)                      :: imode,nswd_m,jmode,jreuse
 REAL(KIND=RP)                         :: dc_over
 INTEGER(KIND=IB)                      :: iwarm
 REAL(KIND=RP),DIMENSION(NMODE)        :: EtmpSWD
@@ -180,7 +182,10 @@ ENDIF
 
 !!
 !! Forward-model every curve slot on its OWN period grid and point count, as
-!! the Rayleigh mode MODE_OF(imode) (0 = fundamental; RAYDSPN counts roots).
+!! the Rayleigh mode MODE_OF(imode) (0 = fundamental; RAYDSPN counts roots)
+!! and velocity type GRP_OF(imode) (0 phase, 1 group). One root search gives
+!! both velocities (dispersion_cu), so a phase slot and a group slot of the
+!! same mode on the same period grid share a single solve.
 !!
 dc_over = SWD_DC_OVER
 IF(dc_over <= 0._RP) dc_over = SWD_DC/5._RP
@@ -198,25 +203,49 @@ IF(iwarm < 0)THEN
   !! DVSCON that c(T) rises with period, so the warm start is exact there too
   IF(DVSMONO >= 0._RP) iwarm = 1
 ENDIF
+cbuf = 0._SP; ubuf = 0._SP; ivbuf = 0
 DO imode = 1,NMODE
   nswd_m = NDAT_MODE(imode)
   IF(nswd_m <= 0) CYCLE
-  periods = 0._SP
-  periods(1:nswd_m) = REAL(obj%periods(imode,1:nswd_m),SP)
   !!
-  !!  Need to append PREM perturbed by half-space perturbation here to
-  !!  ensure that long period SWD can be properly modelled.
+  !! Reuse the root solve of an earlier slot with the same mode number on the
+  !! bit-identical period grid (typically the phase/group pair of one mode).
   !!
-  CALL dispersion(obj%nunique+1+NPREM,curmod2(1:obj%nunique+1+NPREM,2)/1000., &
-       curmod2(1:obj%nunique+1+NPREM,3)/1000.,curmod2(1:obj%nunique+1+NPREM,4)/1000.,&
-       curmod2(1:obj%nunique+1+NPREM,1)/1000.,DpredSWD,&
-       periods,nswd_m,IGRP,ierr_swd,MODE_OF(imode),ivalidSWD,&
-       REAL(SWD_CMIN,SP),REAL(SWD_CMAX,SP),REAL(SWD_DC,SP),REAL(dc_over,SP),iwarm)
+  jreuse = 0
+  DO jmode = 1,imode-1
+    IF(NDAT_MODE(jmode) /= nswd_m) CYCLE
+    IF(MODE_OF(jmode) /= MODE_OF(imode)) CYCLE
+    IF(ANY(obj%periods(jmode,1:nswd_m) /= obj%periods(imode,1:nswd_m))) CYCLE
+    jreuse = jmode
+    EXIT
+  ENDDO
+  IF(jreuse > 0)THEN
+    cbuf(imode,:)  = cbuf(jreuse,:)
+    ubuf(imode,:)  = ubuf(jreuse,:)
+    ivbuf(imode,:) = ivbuf(jreuse,:)
+    IF(IMAP == 1) WRITE(*,*) 'SWD slot',imode,'reuses the root solve of slot',jreuse
+  ELSE
+    periods = 0._SP
+    periods(1:nswd_m) = REAL(obj%periods(imode,1:nswd_m),SP)
+    !!
+    !!  Need to append PREM perturbed by half-space perturbation here to
+    !!  ensure that long period SWD can be properly modelled.
+    !!
+    CALL dispersion_cu(obj%nunique+1+NPREM,curmod2(1:obj%nunique+1+NPREM,2)/1000., &
+         curmod2(1:obj%nunique+1+NPREM,3)/1000.,curmod2(1:obj%nunique+1+NPREM,4)/1000.,&
+         curmod2(1:obj%nunique+1+NPREM,1)/1000.,DpredSWD,UpredSWD,&
+         periods,nswd_m,ierr_swd,MODE_OF(imode),ivalidSWD,&
+         REAL(SWD_CMIN,SP),REAL(SWD_CMAX,SP),REAL(SWD_DC,SP),REAL(dc_over,SP),iwarm)
 
-  IF(ierr_swd < 0)THEN
-    !! Hard input error in the propagator: reject.
-    logL = -HUGE(1._RP)
-    RETURN
+    IF(ierr_swd < 0)THEN
+      !! Hard input error in the propagator: reject.
+      IF(IMAP == 1) WRITE(*,*) 'WARNING: SWD slot',imode,'propagator input error; model rejected'
+      logL = -HUGE(1._RP)
+      RETURN
+    ENDIF
+    cbuf(imode,1:nswd_m)  = DpredSWD(1:nswd_m)
+    ubuf(imode,1:nswd_m)  = UpredSWD(1:nswd_m)
+    ivbuf(imode,1:nswd_m) = ivalidSWD(1:nswd_m)
   ENDIF
   !!
   !! Every OBSERVED datum must be predictable. A model that cannot produce a
@@ -226,12 +255,18 @@ DO imode = 1,NMODE
   !! failed points instead would be WRONG: the number of data would then vary
   !! between models and the likelihood would reward vanishing modes.
   !!
-  IF(SUM(ivalidSWD(1:nswd_m)) < nswd_m)THEN
+  IF(SUM(ivbuf(imode,1:nswd_m)) < nswd_m)THEN
+    IF(IMAP == 1) WRITE(*,*) 'WARNING: SWD slot',imode,'(mode',MODE_OF(imode),') has no root at', &
+                             nswd_m-SUM(ivbuf(imode,1:nswd_m)),'observed periods; model rejected'
     logL = -HUGE(1._RP)
     RETURN
   ENDIF
 
-  obj%DpredSWD(imode,1:nswd_m) = REAL(DpredSWD(1:nswd_m),RP)
+  IF(GRP_OF(imode) == 1)THEN
+    obj%DpredSWD(imode,1:nswd_m) = REAL(ubuf(imode,1:nswd_m),RP)
+  ELSE
+    obj%DpredSWD(imode,1:nswd_m) = REAL(cbuf(imode,1:nswd_m),RP)
+  ENDIF
   obj%DresSWD(imode,1:nswd_m)  = obj%DobsSWD(imode,1:nswd_m)-obj%DpredSWD(imode,1:nswd_m)
 ENDDO
 

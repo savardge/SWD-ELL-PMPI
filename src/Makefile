@@ -11,7 +11,14 @@ OBJS = $(OBJ)/data_type.o $(OBJ)/rjmcmc_com.o $(OBJ)/alloc_obj.o $(OBJ)/read_inp
        $(OBJ)/UPDATE_MAPfile.o $(OBJ)/xcorr.o $(OBJ)/COVmatEst.o $(OBJ)/UpdateCOV.o \
        $(OBJ)/prjmh_temper_rf.o
 FO = $(OBJ)/libswd.a
-LIB = -framework Accelerate   # LAPACK/BLAS for DPOTRF/DPOTRI (COVmatEst); use -llapack -lblas on Linux
+## LAPACK/BLAS for DPOTRF/DPOTRI (COVmatEst): Accelerate on macOS; on Linux
+## FlexiBLAS (foss toolchains, e.g. bamboo `module load foss/2025b`) or
+## override with `make LIB="-llapack -lblas"`.
+ifeq ($(shell uname),Darwin)
+LIB = -framework Accelerate
+else
+LIB ?= -lflexiblas
+endif
 ##############################################################################
 
 all: dirs bin/prjmh_temper_rf

@@ -20,7 +20,7 @@ python make_figures.py            # -> figures/fig1..fig5 (PNG + PDF)
 
 | file | what it does |
 |---|---|
-| `disp_driver.f90` | calls `dispersion()` exactly as `LOGLHOOD_SWD` does, once with `IGRP=0` and once with `IGRP=1`; emits CSV |
+| `disp_driver.f90` | calls `dispersion_cu()` exactly as `LOGLHOOD_SWD` does (phase and group velocity from one root search); emits CSV |
 | `make_figures.py` | the five figures below |
 | `models.py` | 16 test models: normal dispersion, gradients, LVZs, fast lid over slow channel, dry and saturated tailings |
 | `compare_disba.py` | main comparison; summary table + per-period `detail.csv` |

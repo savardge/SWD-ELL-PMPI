@@ -1,4 +1,9 @@
-subroutine dispersion(nlyrs,rho,alpha,beta,thick,vel,peri,NTMAX,IGRP,ier,nmode_in,ivalid,cmin_in,cmax_in,dc_in,dc_over_in,iwarm_in)
+subroutine dispersion_cu(nlyrs,rho,alpha,beta,thick,velc,velu,peri,NTMAX,ier,nmode_in,ivalid,cmin_in,cmax_in,dc_in,dc_over_in,iwarm_in)
+!! Returns BOTH the phase velocity velc and the group velocity velu of mode
+!! nmode_in at every period: DISPER80 evaluates the analytic group velocity
+!! (energy integrals, RAYMRX with IG=3) at every converged phase root, so
+!! both come out of one root search. dispersion() below is the original
+!! single-output entry point (selects one of the two by IGRP).
 ! C ----------------------------------------------------------------------
 ! C Hrvoje Tkalcic, February 25, 2005, LLNL
 ! C The only input file is model.0              
@@ -24,7 +29,7 @@ subroutine dispersion(nlyrs,rho,alpha,beta,thick,vel,peri,NTMAX,IGRP,ier,nmode_i
                thick(nlyrs), smooth(nlyrs), beta_ap(nlyrs),&
                weight(nlyrs), cmin, cmax,& 
                dc, tol, pi2, w, ax(nlyrs), c(NTMAX), u(NTMAX), &
-               vel(NTMAX), ekd, y0l(6),&
+               velc(NTMAX), velu(NTMAX), ekd, y0l(6),&
                vp(2*nlyrs), vs(2*nlyrs), z(2*nlyrs), za,&
                cwarm, pwarm, cwback, cwfwd, clow,&
                y0r(3), yij(15), ap(nlyrs), ae(nlyrs), peri (NTMAX)
@@ -179,7 +184,8 @@ DO iper=1,NTMAX
   IF(ier < 0)THEN
     !! Hard input error: abort the whole call (ier propagates to the caller).
     ivalid(iper:NTMAX) = 0
-    vel = 0.
+    velc = 0.
+    velu = 0.
     RETURN
   ENDIF
   !! ier = 1 (slow convergence) and 2 (root not found) both mean "no usable
@@ -226,12 +232,31 @@ IF (iwarm == 1) THEN
   ENDDO
 ENDIF
 
-!! Select either group (u) or phase (c) velocity
 ier = 0
+velc = c
+velu = u
+RETURN
+END SUBROUTINE dispersion_cu
+
+!! ---------------------------------------------------------------------
+!! Original entry point: one output array, phase (IGRP = 0) or group
+!! (IGRP = 1) velocity. Thin wrapper around dispersion_cu, so every caller
+!! that only needs one of the two is unchanged and bit-identical.
+!! ---------------------------------------------------------------------
+subroutine dispersion(nlyrs,rho,alpha,beta,thick,vel,peri,NTMAX,IGRP,ier,nmode_in,ivalid,cmin_in,cmax_in,dc_in,dc_over_in,iwarm_in)
+      INTEGER   nlyrs, NTMAX, IGRP, ier
+      INTEGER, INTENT(IN)  :: nmode_in, iwarm_in
+      INTEGER, INTENT(OUT) :: ivalid(NTMAX)
+      REAL      alpha(nlyrs), beta(nlyrs), rho(nlyrs), thick(nlyrs)
+      REAL      vel(NTMAX), peri(NTMAX)
+      REAL, INTENT(IN) :: cmin_in, cmax_in, dc_in, dc_over_in
+      REAL      velc(NTMAX), velu(NTMAX)
+CALL dispersion_cu(nlyrs,rho,alpha,beta,thick,velc,velu,peri,NTMAX,ier,nmode_in,ivalid,&
+                   cmin_in,cmax_in,dc_in,dc_over_in,iwarm_in)
 IF(IGRP == 1)THEN
-  vel = u
+  vel = velu
 ELSE
-  vel = c
+  vel = velc
 ENDIF
 RETURN
-END SUBROUTINE
+END SUBROUTINE dispersion

@@ -361,6 +361,21 @@ DO ivo = 1,obj%k
 ENDDO
 IF(ICOV_SWD >= 1 .AND. I_SWD == 1) obj%sdparSWD = tmpmap(NFPMX+2:NFPMX+1+NMODE)
 IF(ICOV_ELL >= 1 .AND. I_ELL == 1) obj%sdparELL = tmpmap(NFPMX+1+NMODE+1:NFPMX+1+NMODE+NMODE_ELL)
+!!
+!! The sigma proposal is a random walk from the map_voro value that is
+!! rejected outside [minlimsdSWD, maxlimsdSWD]: a start outside the prior box
+!! would never move, silently. Refuse it.
+!!
+IF(ICOV_SWD >= 1 .AND. I_SWD == 1 .AND. ISD_SWD == 1)THEN
+  DO ipar = 1,NMODE
+    IF(obj%sdparSWD(ipar) < minlimsdSWD(ipar) .OR. obj%sdparSWD(ipar) > maxlimsdSWD(ipar))THEN
+      IF(rank == src) WRITE(6,*) 'ERROR: starting sigma of SWD slot',ipar,'=',obj%sdparSWD(ipar), &
+        ' is outside its prior [',minlimsdSWD(ipar),',',maxlimsdSWD(ipar),']; fix ',TRIM(mapfile)
+      CALL MPI_FINALIZE(ierr)
+      STOP
+    ENDIF
+  ENDDO
+ENDIF
 IF(IAR == 1)THEN
   obj%arparSWD = tmpmap(NFPMX+1+NMODE+NMODE_ELL+1:NFPMX+1+2*NMODE+NMODE_ELL)
   obj%arparELL = tmpmap(NFPMX+1+2*NMODE+NMODE_ELL+1:NFPMX+1+2*NMODE+2*NMODE_ELL)
@@ -449,8 +464,13 @@ IF(ISMPPRIOR == 1)CALL LOGLHOOD2(obj)
 IF (icovIter > 0_IB)  THEN
 
     IF (ICOVest==1) THEN
-        IF(I_SWD==1) sampleDres(1, 1:NMODE2*NDAT_SWD) = obj%DresSWD(NMODE,:) 
-        IF(I_ELL==1) sampleDres(1, NMODE2*NDAT_SWD+1:NMODE2*NDAT_SWD+NMODE_ELL2*NDAT_ELL) = obj%DresELL(NMODE_ELL,:)
+        !! residual ensemble, one NDAT-wide block per curve slot
+        DO ipar = 1,NMODE2
+          sampleDres(1, (ipar-1)*NDAT_SWD+1:ipar*NDAT_SWD) = obj%DresSWD(ipar,:)
+        ENDDO
+        DO ipar = 1,NMODE_ELL2
+          sampleDres(1, NMODE2*NDAT_SWD+(ipar-1)*NDAT_ELL+1:NMODE2*NDAT_SWD+ipar*NDAT_ELL) = obj%DresELL(ipar,:)
+        ENDDO
         sampleDres(1, ncount3) = 1._RP
 
     ELSEIF (ICOVest==2) THEN
@@ -2089,8 +2109,13 @@ DO ic = 1,2
     !!----------------------------------------------------------------------------------------
     IF (.NOT.cov_converged) THEN
     IF ( (ICOVest==2) .AND. (MOD(imcmc1,CHAINTHIN_COVest_period)==0) ) THEN
-        IF(I_SWD==1) sample2(ikeep2, 1:NMODE2*NDAT_SWD) = objm(ic)%DresSWD(NMODE,:) 
-        IF(I_ELL==1) sample2(ikeep2, NMODE2*NDAT_SWD+1:NMODE2*NDAT_SWD+NMODE_ELL2*NDAT_ELL) = objm(ic)%DresELL(NMODE_ELL,:)
+        !! residual ensemble, one NDAT-wide block per curve slot
+        DO jidx = 1,NMODE2
+          sample2(ikeep2, (jidx-1)*NDAT_SWD+1:jidx*NDAT_SWD) = objm(ic)%DresSWD(jidx,:)
+        ENDDO
+        DO jidx = 1,NMODE_ELL2
+          sample2(ikeep2, NMODE2*NDAT_SWD+(jidx-1)*NDAT_ELL+1:NMODE2*NDAT_SWD+jidx*NDAT_ELL) = objm(ic)%DresELL(jidx,:)
+        ENDDO
         sample2(ikeep2, ncount3) = LOG(pk(objm(ic)%k)) + objm(ic)%logL
         ikeep2 = ikeep2 + 1_IB
         IF(ikeep2 > NKEEP3)THEN

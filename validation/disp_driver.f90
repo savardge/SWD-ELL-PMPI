@@ -1,9 +1,9 @@
 !! Standalone driver around the production SWD forward model, for validation
 !! against an independent implementation (disba).
 !!
-!! Calls dispersion() exactly as LOGLHOOD_SWD does -- same warm start, same
-!! per-period validity flags -- once with IGRP=0 (phase) and once with IGRP=1
-!! (group), for every requested mode.
+!! Calls dispersion_cu() exactly as LOGLHOOD_SWD does -- same warm start, same
+!! per-period validity flags -- which returns phase AND group velocity of one
+!! root search, for every requested mode.
 !!
 !! Usage:
 !!   ./disp_driver models.txt periods.txt maxmode cmin cmax dc dc_over iwarm
@@ -20,7 +20,7 @@ PROGRAM disp_driver
   IMPLICIT NONE
   INTEGER, PARAMETER :: NTMAX = 500, NLMAX = 500, NMODMAX = 100000
   REAL    :: peri(NTMAX), cph(NTMAX), cgr(NTMAX)
-  INTEGER :: ivalid(NTMAX), ivalidg(NTMAX)
+  INTEGER :: ivalid(NTMAX)
   REAL    :: thick(NLMAX), rho(NLMAX), vp(NLMAX), vs(NLMAX)
   REAL    :: cmin, cmax, dc, dcov
   INTEGER :: nt, nl, imod, iper, ier, mode, maxmode, iwarm, i
@@ -55,17 +55,12 @@ PROGRAM disp_driver
     ENDDO
 
     DO mode = 0, maxmode
-      !! Phase velocity (IGRP = 0)
-      CALL dispersion(nl, rho, vp, vs, thick, cph, peri, nt, 0, ier, mode, &
-                      ivalid, cmin, cmax, dc, dcov, iwarm)
-      !! Group velocity (IGRP = 1) -- same root, same scan, different output
-      CALL dispersion(nl, rho, vp, vs, thick, cgr, peri, nt, 1, ier, mode, &
-                      ivalidg, cmin, cmax, dc, dcov, iwarm)
+      !! Phase AND group velocity from the one root search (dispersion_cu;
+      !! this is what LOGLHOOD_SWD calls).
+      CALL dispersion_cu(nl, rho, vp, vs, thick, cph, cgr, peri, nt, ier, mode, &
+                         ivalid, cmin, cmax, dc, dcov, iwarm)
 
       DO iper = 1, nt
-        !! The two passes must agree on which periods carry a root; if they
-        !! ever disagree, mark the period invalid so the comparison sees it.
-        IF (ivalid(iper) /= ivalidg(iper)) ivalid(iper) = 0
         IF (ivalid(iper) == 0) THEN
           cph(iper) = 0.
           cgr(iper) = 0.

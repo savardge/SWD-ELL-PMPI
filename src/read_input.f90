@@ -102,7 +102,22 @@ READ(20,*) I_SET_RANGE_ELL !! 48
 !!                        mode: <base>_SWD.dat (mode 0), <base>_SWD_M<m>.dat.
 !!                        Absent = 0 1 ... NMODE-1.  E.g. "MODE_OF 0 2" fits
 !!                        the fundamental + second higher mode with no R1.
-!!   IGRP    0|1          0 = phase velocity (default), 1 = group velocity.
+!!   IGRP    0|1          0 = phase velocity (default), 1 = group velocity:
+!!                        the type of EVERY curve slot unless GRP_OF is given.
+!!   GRP_OF g1 g2 ...     velocity type of each curve slot (NMODE values, 0 =
+!!                        phase, 1 = group). Lets one run invert e.g. R0 phase
+!!                        + R0 group: "MODE_OF 0 0" + "GRP_OF 0 1". The
+!!                        (mode, type) pairs must be unique; order is free.
+!!                        Group slots read <base>_SWDG.dat / _SWDG_M<m>.dat
+!!                        (and _sdSWDG* for ICOV_SWD = 3). A phase and a group
+!!                        slot with the same mode and the same period grid
+!!                        share one root solve (the group velocity is the
+!!                        analytic U at the phase root).
+!!   SDMN_SWD s1 s2 ...   per-slot lower bound of the hierarchical sigma prior
+!!   SDMX_SWD s1 s2 ...   per-slot upper bound (NMODE values each). Absent =
+!!                        the scalar sdmn(1)/sdmx(1) of lines 33/34 for every
+!!                        slot. Phase and group are measured independently and
+!!                        carry different noise, so their sigma priors differ.
 !!   SWD_WARM 0|1|-1      warm-started root scan: march each mode's root from
 !!                        the previous period instead of rescanning from cmin
 !!                        (3-8x fewer propagator calls). -1 (default) enables
@@ -114,10 +129,13 @@ READ(20,*) I_SET_RANGE_ELL !! 48
 !!                        dc_over (default dc/5; give it explicitly, e.g.
 !!                        0.001, for bit-reproducible runs across builds).
 !!
-ALLOCATE( MODE_OF(NMODE) )
+ALLOCATE( MODE_OF(NMODE), GRP_OF(NMODE), SDMN_SWD(NMODE), SDMX_SWD(NMODE) )
 DO ntmp2 = 1,NMODE
   MODE_OF(ntmp2) = ntmp2-1
 ENDDO
+GRP_OF   = -1      !! -1 = not given; resolved to IGRP after the loop (so IGRP
+SDMN_SWD = -1._RP  !!      and GRP_OF lines work in either order)
+SDMX_SWD = -1._RP
 DO
   READ(20,'(A)',IOSTAT=io_kw) kwline
   IF(io_kw /= 0) EXIT
@@ -150,6 +168,24 @@ DO
     READ(kwline(ipos:),*,IOSTAT=io_kw) SWD_WARM
   CASE ('IGRP')
     READ(kwline(ipos:),*,IOSTAT=io_kw) IGRP
+  CASE ('GRP_OF')
+    READ(kwline(ipos:),*,IOSTAT=io_kw) GRP_OF
+    IF(io_kw /= 0)THEN
+      WRITE(6,*) 'ERROR: GRP_OF needs NMODE =',NMODE,' integers (0 phase, 1 group): ',TRIM(kwline)
+      STOP
+    ENDIF
+  CASE ('SDMN_SWD')
+    READ(kwline(ipos:),*,IOSTAT=io_kw) SDMN_SWD
+    IF(io_kw /= 0)THEN
+      WRITE(6,*) 'ERROR: SDMN_SWD needs NMODE =',NMODE,' values: ',TRIM(kwline)
+      STOP
+    ENDIF
+  CASE ('SDMX_SWD')
+    READ(kwline(ipos:),*,IOSTAT=io_kw) SDMX_SWD
+    IF(io_kw /= 0)THEN
+      WRITE(6,*) 'ERROR: SDMX_SWD needs NMODE =',NMODE,' values: ',TRIM(kwline)
+      STOP
+    ENDIF
   CASE ('SWD_SCAN')
     READ(kwline(ipos:),*,IOSTAT=io_kw) SWD_CMIN,SWD_CMAX,SWD_DC,SWD_DC_OVER
     IF(io_kw > 0)THEN
@@ -165,13 +201,49 @@ DO
   END SELECT
   io_kw = 0
 ENDDO
-DO ntmp2 = 2,NMODE
-  IF(MODE_OF(ntmp2) <= MODE_OF(ntmp2-1) .OR. MODE_OF(1) < 0)THEN
-    WRITE(6,*) 'ERROR: MODE_OF must be ascending and >= 0:',MODE_OF
-    STOP
-  ENDIF
-ENDDO
 CLOSE(20)
+!!
+!! Resolve the per-slot defaults and validate the slot table.
+!! A slot is identified by its (mode, type) pair; the pairs must be unique
+!! (two identical slots would count the same data twice) but need not be
+!! ordered.
+!!
+WHERE(GRP_OF < 0) GRP_OF = IGRP
+WHERE(SDMN_SWD < 0._RP) SDMN_SWD = sdmn(1)
+WHERE(SDMX_SWD < 0._RP) SDMX_SWD = sdmx(1)
+IF(ANY(MODE_OF < 0))THEN
+  WRITE(6,*) 'ERROR: MODE_OF must be >= 0:',MODE_OF
+  STOP
+ENDIF
+IF(ANY(GRP_OF < 0 .OR. GRP_OF > 1))THEN
+  WRITE(6,*) 'ERROR: GRP_OF / IGRP must be 0 (phase) or 1 (group):',GRP_OF
+  STOP
+ENDIF
+DO ntmp2 = 2,NMODE
+  DO ntmp = 1,ntmp2-1
+    IF(MODE_OF(ntmp) == MODE_OF(ntmp2) .AND. GRP_OF(ntmp) == GRP_OF(ntmp2))THEN
+      WRITE(6,*) 'ERROR: curve slots',ntmp,'and',ntmp2,'are both mode',MODE_OF(ntmp2), &
+                 ' type',GRP_OF(ntmp2),' (0 phase, 1 group); (MODE_OF, GRP_OF) pairs must be unique'
+      STOP
+    ENDIF
+  ENDDO
+ENDDO
+IF(ANY(SDMX_SWD <= SDMN_SWD))THEN
+  WRITE(6,*) 'ERROR: SDMX_SWD must exceed SDMN_SWD for every slot:',SDMN_SWD,SDMX_SWD
+  STOP
+ENDIF
+!!
+!! The empirical-covariance likelihood (ICOV_SWD = 2) and the iterative
+!! covariance estimation hold ONE NDAT_SWD x NDAT_SWD matrix that is applied
+!! to every slot (loglhood.f90, UpdateCOV.f90) and re-estimated from the first
+!! slot's residuals only; that is meaningless for several curves on different
+!! grids with different noise. The covparameter file is read after this
+!! routine, so the covariance-iteration half of the guard is in READCOVPARFile.
+!!
+IF(I_SWD == 1 .AND. NMODE > 1 .AND. ICOV_SWD == 2)THEN
+  WRITE(6,*) 'ERROR: ICOV_SWD = 2 (Cdi file) supports a single SWD curve; NMODE =',NMODE
+  STOP
+ENDIF
 
 IF (I_SWD==1) THEN
     NMODE2 = NMODE
@@ -333,9 +405,10 @@ IF(IAR == 1)THEN
 ENDIF
 
 IF(ICOV_SWD >= 1)THEN
-  !! Set prior and proposal scaling for data error standard deviations:
-  minlimsdSWD   = sdmn(1)
-  maxlimsdSWD   = sdmx(1)
+  !! Set prior and proposal scaling for data error standard deviations
+  !! (per slot: keywords SDMN_SWD/SDMX_SWD, default = the scalar sdmn/sdmx):
+  minlimsdSWD   = SDMN_SWD
+  maxlimsdSWD   = SDMX_SWD
   pertsdsdscSWD = 10._RP  !! also it is set in UpdateCOV()
   maxpertsdSWD  = maxlimsdSWD-minlimsdSWD
   pertsdsdSWD   = maxpertsdSWD/pertsdsdscSWD
@@ -412,6 +485,9 @@ IMPLICIT NONE
   WRITE(6,*) 'RHO_BROCHER= ', RHO_BROCHER
   WRITE(6,*) 'MODE_OF    = ', MODE_OF
   WRITE(6,*) 'IGRP       = ', IGRP
+  WRITE(6,*) 'GRP_OF     = ', GRP_OF, '  (0 phase, 1 group)'
+  WRITE(6,*) 'SDMN_SWD   = ', SDMN_SWD
+  WRITE(6,*) 'SDMX_SWD   = ', SDMX_SWD
   WRITE(6,*) 'SWD_SCAN   = ', SWD_CMIN, SWD_CMAX, SWD_DC, SWD_DC_OVER
   WRITE(6,*) 'SWD_WARM   = ', SWD_WARM
   IF (icovIter==0_IB) WRITE(6,*) 'Done reading parameter file.'
@@ -435,7 +511,7 @@ IMPLICIT NONE
 INTEGER(KIND=RP):: iaz,idat,io
 INTEGER(KIND=IB):: imode,nswd_m
 CHARACTER(LEN=100) :: swdfile
-CHARACTER(LEN=8)   :: modestr
+CHARACTER(LEN=5)   :: vtype
 TYPE(objstruc)  :: obj
 
 IF(I_SWD == 1)THEN
@@ -443,8 +519,10 @@ IF(I_SWD == 1)THEN
   !! Surface wave dispersion data:
   !!
   !!
-  !! One file per curve slot, named by its Rayleigh MODE number (MODE_OF):
-  !!   mode 0 -> <base>_SWD.dat, mode m -> <base>_SWD_M<m>.dat
+  !! One file per curve slot, named by its Rayleigh MODE number (MODE_OF) and
+  !! velocity type (GRP_OF), see SWD_SLOT_FILE:
+  !!   phase: mode 0 -> <base>_SWD.dat,  mode m -> <base>_SWD_M<m>.dat
+  !!   group: mode 0 -> <base>_SWDG.dat, mode m -> <base>_SWDG_M<m>.dat
   !! Each is read to EOF; the count goes into NDAT_MODE, so curves may have
   !! different numbers of points on different frequency grids (NDAT_SWD is
   !! only the array width).
@@ -454,15 +532,11 @@ IF(I_SWD == 1)THEN
   obj%periods = 0._RP
   obj%DobsSWD = 0._RP
   DO imode = 1,NMODE
-    IF(MODE_OF(imode) == 0)THEN
-      swdfile = infileSWD
-    ELSE
-      WRITE(modestr,'(I0)') MODE_OF(imode)
-      swdfile = filebase(1:filebaselen) // '_SWD_M' // TRIM(modestr) // '.dat'
-    ENDIF
+    CALL SWD_SLOT_FILE(imode,0,swdfile)
+    vtype = MERGE('group','phase',GRP_OF(imode) == 1)
     OPEN(20,FILE=swdfile,FORM='formatted',STATUS='OLD',ACTION='READ',IOSTAT=io)
     IF(io /= 0)THEN
-      WRITE(6,*) 'ERROR: cannot open SWD data file for mode ',MODE_OF(imode),': ',TRIM(swdfile)
+      WRITE(6,*) 'ERROR: cannot open SWD data file for mode ',MODE_OF(imode),' ',vtype,': ',TRIM(swdfile)
       STOP
     ENDIF
     nswd_m = 0
@@ -478,11 +552,11 @@ IF(I_SWD == 1)THEN
     ENDDO
     CLOSE(20)
     IF(nswd_m == 0)THEN
-      WRITE(6,*) 'ERROR: no data read for SWD mode ',MODE_OF(imode),' from ',TRIM(swdfile)
+      WRITE(6,*) 'ERROR: no data read for SWD mode ',MODE_OF(imode),' ',vtype,' from ',TRIM(swdfile)
       STOP
     ENDIF
     NDAT_MODE(imode) = nswd_m
-    WRITE(6,*) 'SWD mode ',MODE_OF(imode),':',nswd_m,' points from ',TRIM(swdfile)
+    WRITE(6,*) 'SWD mode ',MODE_OF(imode),' ',vtype,':',nswd_m,' points from ',TRIM(swdfile)
     IF(nswd_m == NDAT_SWD)THEN
       WRITE(6,*) '  NOTE: hit NDAT_SWD; increase it if this file has more rows.'
     ENDIF
@@ -502,7 +576,8 @@ IF(I_SWD == 1)THEN
   ELSEIF (ICOV_SWD == 3) THEN
     !!
     !! Per-point standard deviations, ONE FILE PER CURVE SLOT, named like the
-    !! data files: mode 0 -> <base>_sdSWD.dat, mode m -> <base>_sdSWD_M<m>.dat.
+    !! data files with the stem _sdSWD (phase) / _sdSWDG (group), e.g.
+    !! <base>_sdSWD.dat, <base>_sdSWD_M<m>.dat, <base>_sdSWDG.dat.
     !! Each must hold exactly NDAT_MODE(imode) rows (same order as the data).
     !! The likelihood divides by sdSWD, so a missing or short file is FATAL
     !! here rather than a silent zero (which would make every logL NaN and
@@ -511,15 +586,11 @@ IF(I_SWD == 1)THEN
     ALLOCATE(sdSWD(NMODE,NDAT_SWD))
     sdSWD = 0._RP
     DO imode = 1,NMODE
-      IF(MODE_OF(imode) == 0)THEN
-        swdfile = infile_sdSWD
-      ELSE
-        WRITE(modestr,'(I0)') MODE_OF(imode)
-        swdfile = filebase(1:filebaselen) // '_sdSWD_M' // TRIM(modestr) // '.dat'
-      ENDIF
+      CALL SWD_SLOT_FILE(imode,1,swdfile)
+      vtype = MERGE('group','phase',GRP_OF(imode) == 1)
       OPEN(20,FILE=swdfile,FORM='formatted',STATUS='OLD',ACTION='READ',IOSTAT=io)
       IF(io /= 0)THEN
-        WRITE(6,*) 'ERROR: ICOV_SWD=3 but cannot open sd file for mode ',MODE_OF(imode),': ',TRIM(swdfile)
+        WRITE(6,*) 'ERROR: ICOV_SWD=3 but cannot open sd file for mode ',MODE_OF(imode),' ',vtype,': ',TRIM(swdfile)
         STOP
       ENDIF
       nswd_m = 0
@@ -542,7 +613,7 @@ IF(I_SWD == 1)THEN
         WRITE(6,*) 'ERROR: non-positive sd in ',TRIM(swdfile)
         STOP
       ENDIF
-      WRITE(6,*) 'SWD sd  mode ',MODE_OF(imode),':',nswd_m,' points from ',TRIM(swdfile)
+      WRITE(6,*) 'SWD sd  mode ',MODE_OF(imode),' ',vtype,':',nswd_m,' points from ',TRIM(swdfile)
     ENDDO
   ENDIF!!ICOV_SWD
 ENDIF
@@ -580,6 +651,34 @@ IF(I_ELL == 1)THEN
 ENDIF
 RETURN
 END SUBROUTINE READDATA
+!==============================================================================
+
+SUBROUTINE SWD_SLOT_FILE(imode,isd,fname)
+!==============================================================================
+!! File name of SWD curve slot imode: data file (isd = 0) or per-point sd
+!! file (isd = 1, ICOV_SWD = 3). The slot is identified by its Rayleigh mode
+!! number MODE_OF(imode) and velocity type GRP_OF(imode):
+!!   <base>_SWD.dat      mode 0, phase       <base>_sdSWD.dat
+!!   <base>_SWD_M<m>.dat mode m, phase       <base>_sdSWD_M<m>.dat
+!!   <base>_SWDG.dat     mode 0, group       <base>_sdSWDG.dat
+!!   <base>_SWDG_M<m>.dat mode m, group      <base>_sdSWDG_M<m>.dat
+USE RJMCMC_COM
+IMPLICIT NONE
+INTEGER(KIND=IB)  :: imode,isd
+CHARACTER(LEN=*)  :: fname
+CHARACTER(LEN=8)  :: modestr
+CHARACTER(LEN=16) :: stem
+stem = '_SWD'
+IF(isd == 1) stem = '_sdSWD'
+IF(GRP_OF(imode) == 1) stem = TRIM(stem) // 'G'
+IF(MODE_OF(imode) == 0)THEN
+  fname = filebase(1:filebaselen) // TRIM(stem) // '.dat'
+ELSE
+  WRITE(modestr,'(I0)') MODE_OF(imode)
+  fname = filebase(1:filebaselen) // TRIM(stem) // '_M' // TRIM(modestr) // '.dat'
+ENDIF
+RETURN
+END SUBROUTINE SWD_SLOT_FILE
 !==============================================================================
 
 SUBROUTINE PRINTPAR(obj)
@@ -692,7 +791,12 @@ READ(20,*) inonstat_ELL
 READ(20,*) iunbiased_ELL
 READ(20,*) imr_ELL
 READ(20,*) damp_power_ELL
-CLOSE(20) 
+CLOSE(20)
+!! Second half of the single-curve guard of READPARFILE (see there).
+IF(I_SWD == 1 .AND. NMODE > 1 .AND. Icov_iterUpdate_SWD == 1)THEN
+  WRITE(6,*) 'ERROR: iterative covariance estimation (Icov_iterUpdate_SWD = 1) supports a single SWD curve; NMODE =',NMODE
+  STOP
+ENDIF
 
 samplefile_covIter         = filebase(1:filebaselen) // '_voro_sample_covIter.txt'
 samplefile_res_covIter     = filebase(1:filebaselen) // '_voro_sample_res_covIter.txt'

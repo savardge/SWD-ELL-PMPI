@@ -5,7 +5,7 @@ receiver_rjmcmc_varpar_sourceinv_joint format (44/46-line parameter file) to
 the SWD-ELL-PMPI format:
 
   <base>_parameter.dat     48 positional lines + optional keyword tail
-                           (DVSCON, MODE_OF, IGRP, SWD_SCAN)
+                           (DVSCON, MODE_OF, GRP_OF, IGRP, SDMN_SWD, SDMX_SWD, SWD_SCAN)
   <base>_covparameter.dat  35 lines (SWD and ELL datasets only)
   <base>_map_voro.dat      k, voro(NLMX*NPL), sdparSWD(NMODE), sdparELL(NMODE_ELL),
                            arparSWD(NMODE), arparELL(NMODE_ELL)
@@ -57,7 +57,7 @@ order = ['IMAP','IMAGSCALE','ENOS','IPOIPR','IAR','I_VARPAR','IBD_SINGLE','I_SWD
          'STEP_SIZE_ELL','I_SET_COUNT_ELL','COUNT_ELL','I_SET_RANGE_ELL']
 assert len(order) == 48
 out = [f"{g[k]:<18} !! {i+1:2d} {k.rstrip('_')}" for i, k in enumerate(order)]
-out.append('!! ---- optional keyword lines: DVSCON x | MODE_OF m1 m2 .. | IGRP 0|1 | SWD_SCAN cmin cmax dc [dc_over] ----')
+out.append('!! ---- optional keyword lines: DVSCON x | MODE_OF m1 m2 .. | GRP_OF g1 g2 .. | IGRP 0|1 | SDMN_SWD/SDMX_SWD s1 s2 .. | SWD_SCAN cmin cmax dc [dc_over] ----')
 out += tail
 open(os.path.join(dst, f'{fb}_parameter.dat'), 'w').write('\n'.join(out) + '\n')
 
@@ -96,6 +96,6 @@ newmap = [k] + voro + sdswd + sdell + arswd + arell
 assert len(newmap) == 1 + nv + 2*nmode + 2*nmode_ell, len(newmap)
 open(os.path.join(dst, f'{fb}_map_voro.dat'), 'w').write(' '.join(newmap) + '\n')
 for f in os.listdir(src):
-    if f.startswith(f'{fb}_SWD') or f.startswith(f'{fb}_ELL') or f == f'{fb}_vel_ref.txt' or f == 'filebase.txt':
+    if f.startswith(f'{fb}_SWD') or f.startswith(f'{fb}_sdSWD') or f.startswith(f'{fb}_ELL') or f == f'{fb}_vel_ref.txt' or f == 'filebase.txt':
         shutil.copy(os.path.join(src, f), os.path.join(dst, f))
 print(f'converted [{fmt}] {src} -> {dst}: NMODE={nmode}, map {len(newmap)} numbers, tail {tail}')

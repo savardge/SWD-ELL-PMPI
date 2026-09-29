@@ -50,9 +50,10 @@ mpirun -np 12 ../../src/bin/prjmh_temper_rf
 |---|---|
 | `<base>_parameter.dat` | 48 positional lines + optional keyword lines (below) |
 | `<base>_covparameter.dat` | 35 lines: iterative covariance-estimation settings (SWD, ELL); set `ICOVest 0` and `Icov_iterUpdate_* 0` for a plain rjMcMC run |
-| `<base>_SWD.dat` | fundamental-mode curve: `period(s) phase_velocity(km/s)`, ascending period |
-| `<base>_SWD_M<m>.dat` | higher-mode curves, one per mode number `m` listed in `MODE_OF` |
-| `<base>_sdSWD.dat`, `<base>_sdSWD_M<m>.dat` | `ICOV_SWD = 3` only: per-point standard deviations (km/s), one file per curve slot named like the data files, same row order and count as the data file. The likelihood divides residuals by these AND by the curve's sampled `sdparSWD`, so `sdparSWD` becomes a dimensionless scale (set `sdmn`/`sdmx` accordingly, or `ISD_SWD = 0` to fix it at the `map_voro` value, typically 1). A missing or short file, or a non-positive sd, is fatal at read time (2026-09-08; the earlier build read mode slot 1 only and left other slots at zero) |
+| `<base>_SWD.dat` | fundamental-mode phase-velocity curve: `period(s) velocity(km/s)`, ascending period |
+| `<base>_SWD_M<m>.dat` | higher-mode phase curves, one per mode number `m` listed in `MODE_OF` |
+| `<base>_SWDG.dat`, `<base>_SWDG_M<m>.dat` | **group**-velocity curves (slots with `GRP_OF = 1`), same format |
+| `<base>_sdSWD.dat`, `<base>_sdSWD_M<m>.dat`, `<base>_sdSWDG*.dat` | `ICOV_SWD = 3` only: per-point standard deviations (km/s), one file per curve slot named like the data files, same row order and count as the data file. The likelihood divides residuals by these AND by the curve's sampled `sdparSWD`, so `sdparSWD` becomes a dimensionless scale (set `sdmn`/`sdmx` accordingly, or `ISD_SWD = 0` to fix it at the `map_voro` value, typically 1). A missing or short file, or a non-positive sd, is fatal at read time (2026-09-08; the earlier build read mode slot 1 only and left other slots at zero) |
 | `<base>_ELL.dat` | ellipticity data (if `I_ELL = 1`) |
 | `<base>_vel_ref.txt` | reference Vs model when `I_VREF = 1` (node velocities are perturbations around it) |
 | `<base>_map_voro.dat` | starting model: `k`, `NLMX*NPL` node triplets (depth km, dVs, dVpVs; unused slots 0), `sdparSWD(NMODE)`, `sdparELL(NMODE_ELL)`, `arparSWD(NMODE)`, `arparELL(NMODE_ELL)` |
@@ -126,11 +127,25 @@ RHO_BROCHER 1                  density from Vp by Brocher (2005, eq. 1, Nafe-Dra
                                to the polynomial's 1.5-8.5 km/s range. Default 0 = the legacy
                                2.35 + 0.036 (Vp-3)^2 g/cc, a CRUSTAL relation that returns ~2.6 g/cc
                                for a 175 m/s soil (the flat density in vel_ref only feeds the tail)
-MODE_OF  0 2                   Rayleigh mode number of each curve slot (NMODE ascending
-                               integers). Files are named by mode (_SWD.dat, _SWD_M2.dat);
+MODE_OF  0 2                   Rayleigh mode number of each curve slot (NMODE integers
+                               >= 0). Files are named by mode (_SWD.dat, _SWD_M2.dat);
                                "0 2" fits the fundamental + second higher mode with no R1.
                                Absent = 0 1 ... NMODE-1
-IGRP     0                     0 = phase velocity (default), 1 = group velocity
+IGRP     0                     0 = phase velocity (default), 1 = group velocity: the type
+                               of every slot unless GRP_OF is given
+GRP_OF   0 1                   velocity type per curve slot (NMODE values, 0 phase, 1 group).
+                               "MODE_OF 0 0" + "GRP_OF 0 1" inverts R0 phase + R0 group
+                               jointly, each with its own period grid, hierarchical sigma
+                               and AR parameter (phase and group are measured independently
+                               and carry different noise). Group slots read _SWDG*.dat /
+                               _sdSWDG*.dat. The (mode, type) pairs must be unique; order is
+                               free. A phase and a group slot of the same mode on the same
+                               period grid share ONE root search: DISPER80 evaluates the
+                               analytic group velocity (energy integrals) at every phase root
+SDMN_SWD 0.3 0.3               per-slot lower / upper bounds of the hierarchical-sigma prior
+SDMX_SWD 3.0 3.0               (NMODE values each; absent = the scalar sdmn/sdmx of lines
+                               33/34 for every slot). The map_voro start value of every slot
+                               must lie inside its bounds when ISD_SWD = 1 (fatal otherwise)
 SWD_SCAN 0.08 1.6 0.005 0.001  DISPER80 root-scan window cmin cmax and step dc in km/s,
                                optional overtone step dc_over (default dc/5). Default
                                2.0 6.5 0.05 (crustal); near-surface work needs the
@@ -145,6 +160,10 @@ secular function along the c-scan (`swd/raydsp.f`, `RAYDSPN`). A model that
 cannot produce an observed mode at an observed period is rejected (dropping
 the point instead would let the likelihood reward vanishing modes). Each
 curve carries its own hierarchical sigma.
+
+Limitation: `ICOV_SWD = 2` (inverse covariance from a file) and the iterative
+covariance estimation (`Icov_iterUpdate_SWD = 1`) hold a single
+`NDAT_SWD x NDAT_SWD` matrix for all curves and are refused when `NMODE > 1`.
 
 ### Warm-started root scan (speed)
 
