@@ -130,6 +130,12 @@ curmod2(obj%nunique+1+NPREM,1)               = 0.                               
 curmod2(obj%nunique+2:obj%nunique+1+NPREM,2) = vel_prem(4,1:NPREM) * 1000.            !! Density
 curmod2(obj%nunique+2:obj%nunique+1+NPREM,4) = (vel_prem(2,1:NPREM) + factvs) * 1000. !! Vs
 curmod2(obj%nunique+2:obj%nunique+1+NPREM,3) = (vel_prem(2,1:NPREM)+factvs)*(vel_prem(3,1:NPREM)+factvpvs)*1000. !! Vp
+IF(VP_BROCHER == 1 .OR. RHO_BROCHER == 1)THEN
+  !! keep the half-space tail consistent with the sampled layers above it
+  CALL APPLY_BROCHER(NPREM,curmod2(obj%nunique+2:obj%nunique+1+NPREM,4), &
+       curmod2(obj%nunique+2:obj%nunique+1+NPREM,3), &
+       curmod2(obj%nunique+2:obj%nunique+1+NPREM,2))
+ENDIF
 IF(IMAP == 1)THEN
   WRITE(*,*) 'curmod2 (including PREM)'
   DO ilay=1,obj%nunique+1+NPREM+1
@@ -592,6 +598,11 @@ ENDIF
 !curmod(1:obj%nunique+1,2)   = 1000.*0.77+0.32*curmod(:,3)
 !! What Thomas uses:
 curmod(1:obj%nunique+1,2) = (2.35+0.036*((curmod(1:obj%nunique+1,3)/1000.)-3.0)**2.)*1000.
+!! Optional Brocher (2005) replacements (keywords VP_BROCHER / RHO_BROCHER)
+IF(VP_BROCHER == 1 .OR. RHO_BROCHER == 1)THEN
+  CALL APPLY_BROCHER(obj%nunique+1,curmod(1:obj%nunique+1,4), &
+       curmod(1:obj%nunique+1,3),curmod(1:obj%nunique+1,2))
+ENDIF
 
 !!
 !! Convert angles to radians (trend, plunge, strike, dip)
@@ -729,6 +740,7 @@ SUBROUTINE INTERPLAYER(obj)
 !! The layer node always defines the volume partition below the 
 !! node position. The node position defines the interface.
 !! The first layer is always fixed at 0 and all nodes are populated.
+
 !!=======================================================================
 USE DATA_TYPE
 USE RJMCMC_COM
@@ -981,6 +993,44 @@ ELSE
 ENDIF
 RETURN
 END SUBROUTINE GETREF
+
+!!=======================================================================
+SUBROUTINE APPLY_BROCHER(n,vs,vp,rho)
+!!=======================================================================
+!!
+!! Brocher (2005, BSSA 95, 2081-2092) empirical relations.
+!!   eq. 9  Vp  = 0.9409 + 2.0947 Vs - 0.8206 Vs^2 + 0.2683 Vs^3 - 0.0251 Vs^4
+!!                (km/s, 0 < Vs < 4.5)
+!!   eq. 1  rho = 1.6612 Vp - 0.4721 Vp^2 + 0.0671 Vp^3 - 0.0043 Vp^4
+!!                + 0.000106 Vp^5   (g/cc, 1.5 < Vp < 8.5)
+!! Units on entry/exit are the curmod ones: m/s and kg/m^3. Vp is clamped to
+!! [1.5,8.5] km/s ONLY for the density polynomial, so a 1.28 km/s saturated
+!! soil gets rho(1.5) = 1.635 g/cc instead of an extrapolated value, and a
+!! sampled Vp/Vs of 8 on a 2.5 km/s rock cannot send the polynomial negative.
+!!
+USE RJMCMC_COM
+IMPLICIT NONE
+INTEGER(KIND=IB)                  :: n,i
+REAL(KIND=SP),DIMENSION(n)        :: vs,vp,rho
+REAL(KIND=RP)                     :: vsk,vpk,vpc
+DO i=1,n
+  vsk = REAL(vs(i),RP)/1000._RP
+  IF(VP_BROCHER == 1)THEN
+    vpk = 0.9409_RP + 2.0947_RP*vsk - 0.8206_RP*vsk**2 + 0.2683_RP*vsk**3 &
+          - 0.0251_RP*vsk**4
+    vp(i) = REAL(vpk*1000._RP,SP)
+  ELSE
+    vpk = REAL(vp(i),RP)/1000._RP
+  ENDIF
+  IF(RHO_BROCHER == 1)THEN
+    vpc = MIN(MAX(vpk,1.5_RP),8.5_RP)
+    rho(i) = REAL(1000._RP*(1.6612_RP*vpc - 0.4721_RP*vpc**2 + 0.0671_RP*vpc**3 &
+             - 0.0043_RP*vpc**4 + 0.000106_RP*vpc**5),SP)
+  ENDIF
+ENDDO
+RETURN
+END SUBROUTINE APPLY_BROCHER
+!!=======================================================================
 !!=======================================================================
 
 

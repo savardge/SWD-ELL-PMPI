@@ -88,6 +88,15 @@ READ(20,*) I_SET_RANGE_ELL !! 48
 !!                        fast lid over a much slower layer. Absent or < 0 =
 !!                        off. Also enables the warm-started root scan, which
 !!                        is exact when no low-velocity zone can exist.
+!!   VP_BROCHER 0|1       1 = Vp from Vs by Brocher (2005, BSSA 95, eq. 9), valid
+!!                        0 < Vs < 4.5 km/s; the sampled Vp/Vs ratio is then
+!!                        ignored (set dVpVs small). Also applied to the deep
+!!                        half-space tail. Default 0.
+!!   RHO_BROCHER 0|1      1 = density from Vp by Brocher (2005, eq. 1, the
+!!                        Nafe-Drake fit), Vp clamped to its 1.5-8.5 km/s range
+!!                        of validity when evaluating the polynomial. 0 (default)
+!!                        keeps the legacy 2.35 + 0.036 (Vp-3)^2 g/cc, which is a
+!!                        crustal relation and gives ~2.6 g/cc for a 175 m/s soil.
 !!   MODE_OF m1 m2 ...    Rayleigh mode number of each SWD curve slot (NMODE
 !!                        ascending integers >= 0). Slot files are named by
 !!                        mode: <base>_SWD.dat (mode 0), <base>_SWD_M<m>.dat.
@@ -127,6 +136,10 @@ DO
     READ(kwline(ipos:),*,IOSTAT=io_kw) DVSCON
   CASE ('DVSMONO')
     READ(kwline(ipos:),*,IOSTAT=io_kw) DVSMONO
+  CASE ('VP_BROCHER')
+    READ(kwline(ipos:),*,IOSTAT=io_kw) VP_BROCHER
+  CASE ('RHO_BROCHER')
+    READ(kwline(ipos:),*,IOSTAT=io_kw) RHO_BROCHER
   CASE ('MODE_OF')
     READ(kwline(ipos:),*,IOSTAT=io_kw) MODE_OF
     IF(io_kw /= 0)THEN
@@ -395,6 +408,8 @@ IMPLICIT NONE
   WRITE(6,*) '--- multimode SWD keywords ---'
   WRITE(6,*) 'DVSCON     = ', DVSCON
   WRITE(6,*) 'DVSMONO    = ', DVSMONO
+  WRITE(6,*) 'VP_BROCHER = ', VP_BROCHER
+  WRITE(6,*) 'RHO_BROCHER= ', RHO_BROCHER
   WRITE(6,*) 'MODE_OF    = ', MODE_OF
   WRITE(6,*) 'IGRP       = ', IGRP
   WRITE(6,*) 'SWD_SCAN   = ', SWD_CMIN, SWD_CMAX, SWD_DC, SWD_DC_OVER

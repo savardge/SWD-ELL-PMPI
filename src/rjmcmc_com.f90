@@ -42,6 +42,8 @@ MODULE RJMCMC_COM
    INTEGER(KIND=IB),ALLOCATABLE,DIMENSION(:) :: MODE_OF    !! Rayleigh mode number of each curve slot (keyword MODE_OF; default 0..NMODE-1)
    REAL(KIND=RP)    :: DVSCON   = -1._RP   !! max |adjacent-layer dVs| [km/s] indicator prior (keyword DVSCON; < 0 = off)
    REAL(KIND=RP)    :: DVSMONO  = -1._RP   !! max ALLOWED adjacent-layer Vs DECREASE with depth [km/s] (keyword DVSMONO; < 0 = off)
+   INTEGER(KIND=IB) :: VP_BROCHER  = 0  !! 1 = Vp from Vs via Brocher (2005) eq. 9 (keyword VP_BROCHER); overrides the Vp/Vs ratio
+   INTEGER(KIND=IB) :: RHO_BROCHER = 0  !! 1 = density from Vp via Brocher (2005) eq. 1 Nafe-Drake fit (keyword RHO_BROCHER); 0 = the legacy 2.35+0.036(Vp-3)^2
    INTEGER(KIND=IB) :: IGRP     = 0        !! 1 = group velocity, 0 = phase velocity (keyword IGRP)
    REAL(KIND=RP)    :: SWD_CMIN = 2.0_RP   !! DISPER80 phase-speed scan window [km/s] (keyword SWD_SCAN cmin cmax dc [dc_over])
    REAL(KIND=RP)    :: SWD_CMAX = 6.5_RP   !!   defaults = the original crustal values of dispersion.f90

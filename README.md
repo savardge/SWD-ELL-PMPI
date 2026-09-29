@@ -119,6 +119,13 @@ DVSMONO  0.050                 one-sided DVSCON: max ALLOWED adjacent-layer Vs D
                                excluding a fast lid over a much slower layer. Same indicator
                                prior, checked before the forward. Absent/<0 = off. Also
                                enables the warm start (no LVZ can exist, so it is exact)
+VP_BROCHER 1                   Vp from Vs by Brocher (2005, BSSA 95, eq. 9), valid 0 < Vs < 4.5 km/s.
+                               The sampled Vp/Vs is then ignored (leave dVpVs tiny). Also applied
+                               to the deep half-space tail. Default 0
+RHO_BROCHER 1                  density from Vp by Brocher (2005, eq. 1, Nafe-Drake fit), Vp clamped
+                               to the polynomial's 1.5-8.5 km/s range. Default 0 = the legacy
+                               2.35 + 0.036 (Vp-3)^2 g/cc, a CRUSTAL relation that returns ~2.6 g/cc
+                               for a 175 m/s soil (the flat density in vel_ref only feeds the tail)
 MODE_OF  0 2                   Rayleigh mode number of each curve slot (NMODE ascending
                                integers). Files are named by mode (_SWD.dat, _SWD_M2.dat);
                                "0 2" fits the fundamental + second higher mode with no R1.
@@ -175,6 +182,19 @@ models only exist when the adjacent-layer contrast is unconstrained, so with
 `SWD_WARM -1` (the default) the warm start is enabled only when `DVSCON > 0`
 or `DVSMONO >= 0` (a monotonic profile cannot have a channel at all);
 `SWD_WARM 1` forces it on, `SWD_WARM 0` off.
+
+**Root-scan step and high Vp/Vs.** The fundamental root is found by a sign-change
+scan in steps of `dc` (`SWD_SCAN`). For soft, high-Vp/Vs stacks (saturated soil,
+Vp/Vs 4-8) the default 5 m/s step can step over the root pair and the model is
+rejected as if no mode existed: one 175/300/900 m/s test model was rejected at
+`dc` 0.005 and fine at 0.002, with the same logL to 4 digits at 0.002 and 0.001.
+On 60 posterior-like structures under Brocher Vp/density, 59 were valid at 0.005
+and all 60 at 0.003, so use `SWD_SCAN 0.08 2.5 0.003 0.001` (1.7x the cost) for
+any run that leaves the Vp/Vs = 2 regime. Validation of the Brocher path: the
+layer stack the engine prints matches an independent implementation to four
+digits (Vp to 0.0001 m/s, density exactly) and the predicted dispersion matches
+disba on that stack to 0.00 m/s; with both keywords off the predicted data are
+byte-identical to the previous binary (`bin/prjmh_temper_rf.pre_brocher`).
 
 Validation (`swd/test_warm_driver.f90`, `tools/export_test_models.py`): warm
 and cold curves compared on 15 000 models drawn from the real HVC posteriors
