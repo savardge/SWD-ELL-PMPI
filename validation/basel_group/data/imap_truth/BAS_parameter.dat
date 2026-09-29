@@ -1,0 +1,53 @@
+1                  !!  1 IMAP
+0                  !!  2 IMAGSCALE
+0                  !!  3 ENOS
+1                  !!  4 IPOIPR
+0                  !!  5 IAR
+1                  !!  6 I_VARPAR
+0                  !!  7 IBD_SINGLE
+1                  !!  8 I_SWD
+0                  !!  9 I_ELL
+1                  !! 10 I_VREF
+1                  !! 11 I_VPVS
+0                  !! 12 ISMPPRIOR
+1                  !! 13 ISETSEED
+1                  !! 14 IEXCHANGE
+40                 !! 15 NDAT_SWD
+4                  !! 16 NMODE
+30                 !! 17 NDAT_ELL
+1                  !! 18 NMODE_ELL
+2                  !! 19 NLMN
+30                 !! 20 NLMX
+1                  !! 21 ICHAINTHIN
+100                !! 22 NKEEP
+2                  !! 23 NPTCHAINS1
+1.15               !! 24 dTlog
+10.0               !! 25 lambda
+5.0                !! 26 hmx
+0.02               !! 27 hmin
+0.1                !! 28 armxSWD
+0.1                !! 29 armxELL
+1000               !! 30 TCHCKPT
+1.4                !! 31 dVs
+0.15               !! 32 dVpVs
+0.3 0.001          !! 33 sdmn
+3 0.1              !! 34 sdmx
+0                  !! 35 ISD_SWD
+0                  !! 36 ISD_ELL
+0                  !! 37 ICOV_SWD
+1                  !! 38 ICOV_ELL
+0                  !! 39 ELL_verbose
+1.e-5              !! 40 ELL_prec
+1                  !! 41 I_ABS_ELL
+0                  !! 42 I_LOG10_ELL
+0                  !! 43 I_SAMPLING_TYPE_ELL
+0                  !! 44 I_SET_STEP_ELL
+1.5                !! 45 STEP_SIZE_ELL
+0                  !! 46 I_SET_COUNT_ELL
+145                !! 47 COUNT_ELL
+1                  !! 48 I_SET_RANGE_ELL
+!! ---- keyword tail ----
+MODE_OF 0 0 1 1
+GRP_OF  0 1 0 1
+SWD_SCAN 0.6 3.6 0.005 0.001
+SWD_WARM 0     !! the Michel model has LVZs: no DVSCON/DVSMONO, cold scans

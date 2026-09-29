@@ -1,0 +1,44 @@
+Michel stack: 17 layers, Vs 0.783-3.366 km/s, interfaces down to 3.008 km
+engine stack: 20 layers (17 sampled + 3 tail rows)
+  R0 exists at 30/30 periods (engine stack), 30/30 (Michel stack)
+  R1 exists at 20/30 periods (engine stack), 19/30 (Michel stack)
+  R0 engine stack: c 0.9455-2.8191 km/s, U 0.6906-2.5607 km/s (Airy minimum at T = 0.84 s)
+  model-error size: max |Michel stack - engine stack| curve difference = 277.9 m/s (density relation only)
+
+== engine IMAP vs disp_driver ==
+  IMAP slot 1 (mode 0, phase): max |engine - disp_driver| = 1.31e-06 km/s over 30 periods
+  IMAP slot 2 (mode 0, group): max |engine - disp_driver| = 1.07e-04 km/s over 30 periods
+  IMAP slot 3 (mode 1, phase): max |engine - disp_driver| = 2.38e-07 km/s over 20 periods
+  IMAP slot 4 (mode 1, group): max |engine - disp_driver| = 3.04e-05 km/s over 20 periods
+  IMAP reported 2 slot(s) reusing an earlier root solve (expect 2)
+[PASS] engine IMAP == disp_driver on the engine stack to single precision (worst 0.107 m/s)
+
+== DISPER80 vs disba 0.7.0 (dunkin, dc 1e-5, dt 0.005) ==
+  Michel stack R0: worst |c - disba c| = 0.004 m/s, |U - disba GroupDispersion| = 273.369 m/s, |U - U(disba phase curve)| = 0.654 m/s  (30 periods)
+[PASS] Michel stack R0 phase within 0.02 m/s of disba (roots matched by velocity)
+[INFO] Michel stack R0: disba's group velocity disagrees with ours at some periods; disba duplicates roots on this LVZ model (its mode indices shift), so its GroupDispersion and a finite difference along its mode index are not a reference here -- see the own-phase-curve check
+  Michel stack R1: worst |c - disba c| = 0.002 m/s, |U - disba GroupDispersion| = 468.194 m/s, |U - U(disba phase curve)| = 597.465 m/s  (19 periods)
+[PASS] Michel stack R1 phase within 0.02 m/s of disba (roots matched by velocity)
+[INFO] Michel stack R1: disba's group velocity disagrees with ours at some periods; disba duplicates roots on this LVZ model (its mode indices shift), so its GroupDispersion and a finite difference along its mode index are not a reference here -- see the own-phase-curve check
+  engine stack R0: worst |c - disba c| = 0.003 m/s, |U - disba GroupDispersion| = 0.241 m/s, |U - U(disba phase curve)| = 0.649 m/s  (30 periods)
+[PASS] engine stack R0 phase within 0.02 m/s of disba (roots matched by velocity)
+  engine stack R1: worst |c - disba c| = 0.004 m/s, |U - disba GroupDispersion| = 1134.043 m/s, |U - U(disba phase curve)| = 575.494 m/s  (20 periods)
+[PASS] engine stack R1 phase within 0.02 m/s of disba (roots matched by velocity)
+[INFO] engine stack R1: disba's group velocity disagrees with ours at some periods; disba duplicates roots on this LVZ model (its mode indices shift), so its GroupDispersion and a finite difference along its mode index are not a reference here -- see the own-phase-curve check
+
+== analytic group velocity vs finite difference of our own phase curve ==
+  Michel stack R0: analytic U vs U from our own phase curve (h = 0.002): max |diff| = 0.168 m/s, median 0.025 m/s (30 periods)
+[PASS] Michel stack R0 group velocity self-consistent within 1 m/s
+  Michel stack R1: analytic U vs U from our own phase curve (h = 0.002): max |diff| = 0.070 m/s, median 0.012 m/s (19 periods)
+[PASS] Michel stack R1 group velocity self-consistent within 1 m/s
+  engine stack R0: analytic U vs U from our own phase curve (h = 0.002): max |diff| = 0.143 m/s, median 0.021 m/s (30 periods)
+[PASS] engine stack R0 group velocity self-consistent within 1 m/s
+  engine stack R1: analytic U vs U from our own phase curve (h = 0.002): max |diff| = 0.048 m/s, median 0.011 m/s (20 periods; 1 at the cut-off excluded, |diff| 3.0 m/s there)
+[PASS] engine stack R1 group velocity self-consistent within 1 m/s
+
+== DISPER80 vs gpdc (Michel2016_gpdc.disp) ==
+  gpdc .disp (124 points, 0.21-4.29 s) is the GROUP slowness of R0: median |rel diff| vs ours = 0.018 %, max = 0.078 % (the other interpretation: median 36.3 %)
+[PASS] our R0 group velocity within 0.5 % of gpdc on the literal Michel stack
+
+== synthetic data ==
+  wrote 198 rows to synthetic_curves.csv: noise 2 % phase, 4 % group, seed 20260929

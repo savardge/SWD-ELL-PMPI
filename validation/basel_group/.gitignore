@@ -1,0 +1,20 @@
+# engine outputs of the staged runs (large / regenerable); inputs and diagnostics.png are kept
+runs/*/BAS_voro_sample*.txt
+runs/*/BAS_run.log
+runs/*/BAS_RJMH.log
+runs/*/BAS_seeds.log
+runs/*/BAS_stepsize.txt
+runs/*/BAS_sigma.txt
+runs/*/BAS_mappred*.dat
+runs/*/BAS_obs*.dat
+runs/*/BAS_mapar*.dat
+runs/*/mpid
+data/imap_truth/BAS_mappred*.dat
+data/imap_truth/BAS_obs*.dat
+data/imap_truth/BAS_mapar*.dat
+data/imap_truth/BAS_RJMH.log
+data/imap_truth/BAS_seeds.log
+data/imap_truth/BAS_stepsize.txt
+data/imap_truth/BAS_sigma.txt
+logs/
+__pycache__/

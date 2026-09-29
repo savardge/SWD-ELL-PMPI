@@ -181,16 +181,20 @@ DO iper=1,NTMAX
                    ekd,y0r,yij,ier)
     ENDIF
   ENDIF
-  IF(ier < 0)THEN
-    !! Hard input error: abort the whole call (ier propagates to the caller).
-    ivalid(iper:NTMAX) = 0
-    velc = 0.
-    velu = 0.
-    RETURN
-  ENDIF
   !! ier = 1 (slow convergence) and 2 (root not found) both mean "no usable
   !! datum here"; this matches the original all-or-nothing treatment of ier/=0,
   !! but now resolved PER PERIOD instead of for the whole curve.
+  !! ier < 0 is treated the same way (2026-09-29): RAYMRX returns IER = -layer
+  !! as soon as the scan reaches a phase velocity it cannot evaluate, i.e.
+  !! c >= Vs of the half-space (a leaky, non-trapped value), which happens
+  !! whenever cmax exceeds the half-space Vs and the requested mode does not
+  !! exist at this period. That is "no root below the half-space velocity",
+  !! a property of THIS period only. It used to abort the whole call and
+  !! zero the curve, so an overtone cut off at one long period lost all its
+  !! valid short-period values (harmless in the sampler, which rejects such
+  !! a model either way, but wrong for synthetics and posterior forwards).
+  !! Degenerate inputs (L <= 2, W <= 0, DC = 0: RAYDSPN IER = -1) fail at
+  !! every period and so still leave the whole curve invalid.
   IF(ier == 0)THEN
     ivalid(iper) = 1
     cwarm = c(iper)
