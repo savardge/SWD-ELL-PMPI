@@ -246,6 +246,48 @@ from `receiver_rjmcmc_varpar_sourceinv_joint` (44/46-line) format.
   24/39/25 m/s in both, identical logL and k medians. The random streams
   differ because the codes consume the RNG differently.
 
+## Group-velocity synthetic test (2026-09-29, `validation/basel_group/`)
+
+Per-slot phase/group inversion (`GRP_OF`) tested on synthetic Rayleigh curves
+of the Basel-1 / Otterbach-2 well model (Michel et al. 2017; 17 layers to
+3 km, Vs 0.78-3.37 km/s, several LVZs), 30 periods 0.5-6 s, Gaussian noise
+2 % (phase) / 4 % (group), 15 runs of 1 h x 12 ranks on bamboo (design,
+matrix and forward-model checks: `validation/basel_group/README.md`;
+per-run `runs/<name>/diagnostics.png`, `results/summary.csv`,
+`figures/overlay_*.png`).
+
+- **The implementation is correct end to end.** Every run fits its data with
+  reduced chi-square 0.6-0.9 per slot, the hierarchical sigma multiplier of
+  every slot comes back at 0.93-1.17 (expected 1), `R0pg_full_icov1`
+  (`ICOV_SWD 1`, `IMAGSCALE 1`, per-slot bounds) recovers 1.95 % / 3.77 %
+  (truth 2 / 4 %), and `R0pg_mismatch` (group on a different grid, no
+  root-solve reuse) gives the same posterior as `R0pg_full`. The engine's
+  IMAP predictions equal `disp_driver`'s slot by slot, and the analytic group
+  velocity matches the gpdc curve shipped with the model to 0.02 %.
+- **What group velocity adds.** R0 group alone resolves the shallow
+  structure (0.3-1 km: the 0.95/0.86 km/s LVZ under the 1.07 km/s surface
+  layer, the steps at 0.4-0.8 km) better than R0 phase alone, and the joint
+  R0 phase + group run has the narrowest 0-1 km band with the truth inside
+  it; both single-curve runs and the joint run agree from 1 km down (the
+  2.0-2.4 km/s section is smoothed, the 3 km half-space is exact). Adding
+  R1 phase + group starts to resolve the 1.1-1.6 km layering (5/16 true
+  interfaces found vs 2-3), but those runs are 6-8x slower (overtone scan)
+  and were not converged in 1 h (stationarity L1 0.21; re-run for 4-6 h).
+- **Resolution, not the sampler, limits the recovery.** k median 7-9 vs the
+  true 17: the 26-100 m layers of the log are below what 0.5-6 s dispersion
+  can see, and the trans-D posterior replaces them by their average. The
+  68 % bands cover the blocky truth at 40-70 % of depths in 0-2 km, i.e. the
+  independent-noise likelihood is somewhat over-confident against
+  unresolved fine structure, as usual for rjMcMC.
+- **Model error.** With curves computed from the literal Michel stack (true
+  Vp and Gardner density, up to 0.28 km/s different from the engine's own
+  density relation), the sampler absorbs the difference into Vs (the profile
+  shifts by less than the band width) rather than into sigma (0.94 / 0.96):
+  the density relation matters at the percent level on this model.
+- Convergence in 1 h: stationarity / between-chain / burn-in L1 metrics
+  0.02-0.11 for every one- and two-slot run (<= 0.05 comfortable, >= 0.15
+  re-run), 0.21 for the four-slot runs.
+
 ## Post-processing
 
 MATLAB scripts of the original code are in `plotting_scripts/`

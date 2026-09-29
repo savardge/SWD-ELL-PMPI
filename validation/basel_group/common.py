@@ -327,8 +327,21 @@ def read_slot_data(run_dir, cfg, base=BASE):
 
 
 def read_sample(run_dir, base=BASE):
-    dat = np.loadtxt(os.path.join(run_dir, f"{base}_voro_sample.txt"))
-    return dat[None, :] if dat.ndim == 1 else dat
+    """Sample matrix. Rows whose logL is -HUGE (a start state that could not
+    predict an observed mode) are written by the engine with a 3-digit
+    exponent that drops the 'E' ("-1.79769313+308"); they are unreadable for
+    numpy and useless for the posterior, so they are removed."""
+    path = os.path.join(run_dir, f"{base}_voro_sample.txt")
+    try:
+        dat = np.loadtxt(path)
+    except ValueError:
+        import re
+        bad = re.compile(r"\d[+-]\d{3}\b")
+        with open(path) as fh:
+            lines = [l for l in fh if not bad.search(l)]
+        dat = np.loadtxt(lines)
+    dat = dat[None, :] if dat.ndim == 1 else dat
+    return dat[dat[:, 0] > -1e300]
 
 
 def sample_layout(cfg):
