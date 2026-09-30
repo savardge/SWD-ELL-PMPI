@@ -261,24 +261,31 @@ per-run `runs/<name>/diagnostics.png`, `results/summary.csv`,
   every slot comes back at 0.93-1.17 (expected 1), `R0pg_full_icov1`
   (`ICOV_SWD 1`, `IMAGSCALE 1`, per-slot bounds) recovers 1.95 % / 3.77 %
   (truth 2 / 4 %), and `R0pg_mismatch` (group on a different grid, no
-  root-solve reuse) gives the same posterior as `R0pg_full`. The engine's
+  root-solve reuse) behaves like `R0pg_full`. The engine's
   IMAP predictions equal `disp_driver`'s slot by slot, and the analytic group
   velocity matches the gpdc curve shipped with the model to 0.02 %.
-- **What group velocity adds.** R0 group alone resolves the shallow
-  structure (0.3-1 km: the 0.95/0.86 km/s LVZ under the 1.07 km/s surface
-  layer, the steps at 0.4-0.8 km) better than R0 phase alone, and the joint
-  R0 phase + group run has the narrowest 0-1 km band with the truth inside
-  it; both single-curve runs and the joint run agree from 1 km down (the
-  2.0-2.4 km/s section is smoothed, the 3 km half-space is exact). Adding
-  R1 phase + group starts to resolve the 1.1-1.6 km layering (5/16 true
-  interfaces found vs 2-3), but those runs are 6-8x slower (overtone scan)
-  and were not converged in 1 h (stationarity L1 0.21; re-run for 4-6 h).
-- **Resolution, not the sampler, limits the recovery.** k median 7-9 vs the
-  true 17: the 26-100 m layers of the log are below what 0.5-6 s dispersion
-  can see, and the trans-D posterior replaces them by their average. The
-  68 % bands cover the blocky truth at 40-70 % of depths in 0-2 km, i.e. the
-  independent-noise likelihood is somewhat over-confident against
-  unresolved fine structure, as usual for rjMcMC.
+- **What group velocity adds (measured, full band).** Mean 68 % half-width
+  of Vs in 0-1 km: R0 phase 0.172, R0 group 0.165, R0 phase + group
+  0.141 km/s (1-3 km: 0.249 / 0.214 / 0.194); mean |median - truth| in
+  0-1 km 0.34 / 0.32 / 0.32 km/s. So group velocity narrows the bands by
+  ~20 % and the joint run is the tightest, but the posterior median hardly
+  moves: the extra information sharpens the average structure, it does not
+  recover the 26-100 m layers. All R0 runs agree from 1 km down (the
+  2.0-2.4 km/s section is smoothed, the 3 km half-space is exact). Adding R1
+  phase + group starts to resolve the 1.1-1.6 km layering (5/16 true
+  interfaces found by a node-density heuristic vs 2-3), but those runs are
+  6-8x slower (overtone scan) and were not converged in 1 h (stationarity
+  L1 0.21; re-run for 4-6 h). `R0pg_mismatch` (group on 1-4 s only) is
+  consistent with `R0pg_full` with a wider band (0.21 km/s in 0-1 km).
+- **Resolution, not the sampler, limits the recovery -- and the bands are
+  over-confident.** k median 7-9 vs the true 17: the fine layers of the log
+  are below what 0.5-6 s dispersion can see, and the trans-D posterior
+  replaces them by their average. Measured against the blocky truth, the
+  68 % bands contain it at only 13-31 % of depths in 0-1 km and 36-54 % in
+  1-3 km (all runs): the independent-noise likelihood with a hierarchical
+  sigma treats the unresolved layering as absent, not as uncertainty, the
+  usual rjMcMC over-confidence. Interpret the band as the uncertainty of the
+  *smoothed* profile.
 - **Model error.** With curves computed from the literal Michel stack (true
   Vp and Gardner density, up to 0.28 km/s different from the engine's own
   density relation), the sampler absorbs the difference into Vs (the profile

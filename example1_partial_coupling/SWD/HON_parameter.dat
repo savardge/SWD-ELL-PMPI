@@ -46,4 +46,4 @@
 0                  !! 46 I_SET_COUNT_ELL
 145                !! 47 COUNT_ELL
 1                  !! 48 I_SET_RANGE_ELL
-!! ---- optional keyword lines: DVSCON x | MODE_OF m1 m2 .. | IGRP 0|1 | SWD_SCAN cmin cmax dc [dc_over] ----
+!! ---- optional keyword lines (README): DVSCON | DVSMONO | VP_BROCHER | RHO_BROCHER | MODE_OF | GRP_OF | IGRP | SDMN_SWD | SDMX_SWD | SWD_SCAN | SWD_WARM ----

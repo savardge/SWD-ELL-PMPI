@@ -295,7 +295,7 @@ def read_cfg(run_dir, base=BASE):
     cfg["NMODE_ELL"] = int(val(18)[0]); cfg["NLMX"] = int(val(20)[0]); cfg["NPTCHAINS1"] = int(val(23)[0])
     cfg["lambda"] = float(val(25)[0]); cfg["hmx"] = float(val(26)[0]); cfg["ICOV_SWD"] = int(val(37)[0])
     cfg["sdmn"] = [float(val(33)[0])] * cfg["NMODE"]; cfg["sdmx"] = [float(val(34)[0])] * cfg["NMODE"]
-    cfg["MODE_OF"] = list(range(cfg["NMODE"])); cfg["GRP_OF"] = [0] * cfg["NMODE"]
+    cfg["MODE_OF"] = list(range(cfg["NMODE"])); cfg["GRP_OF"] = None; igrp = 0
     for l in lines[48:]:
         l = l.split("!")[0].split()
         if not l:
@@ -306,11 +306,13 @@ def read_cfg(run_dir, base=BASE):
         elif kw == "GRP_OF":
             cfg["GRP_OF"] = [int(x) for x in rest]
         elif kw == "IGRP":
-            cfg["GRP_OF"] = [int(rest[0])] * cfg["NMODE"]
+            igrp = int(rest[0])
         elif kw == "SDMN_SWD":
             cfg["sdmn"] = [float(x) for x in rest]
         elif kw == "SDMX_SWD":
             cfg["sdmx"] = [float(x) for x in rest]
+    if cfg["GRP_OF"] is None:            # as READPARFILE: GRP_OF wins over IGRP whatever the order
+        cfg["GRP_OF"] = [igrp] * cfg["NMODE"]
     cfg["slots"] = list(zip(cfg["MODE_OF"], cfg["GRP_OF"]))
     return cfg
 

@@ -238,7 +238,8 @@ DO imode = 1,NMODE
          REAL(SWD_CMIN,SP),REAL(SWD_CMAX,SP),REAL(SWD_DC,SP),REAL(dc_over,SP),iwarm)
 
     IF(ierr_swd < 0)THEN
-      !! Hard input error in the propagator: reject.
+      !! Defensive only: since 2026-09-29 dispersion_cu resolves every
+      !! propagator failure per period (ivalid), so ier is always 0 here.
       IF(IMAP == 1) WRITE(*,*) 'WARNING: SWD slot',imode,'propagator input error; model rejected'
       logL = -HUGE(1._RP)
       RETURN

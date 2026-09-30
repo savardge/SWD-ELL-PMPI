@@ -31,8 +31,8 @@ cd src && make clean && make      # -> src/bin/prjmh_temper_rf
 - `-fcheck=bounds -g` are on by default in `FFLAGS_COMMON` (cheap insurance);
   drop them for a ~20 % faster production build.
 - `src/swd/` builds `obj/libswd.a` (DISPER80: `raydsp.f`, `raymrx.f`,
-  `dispersion.f90`). `src/*.mod` are symlinks into `src/swd/`. Compiled
-  artefacts are committed, so expect `git status` noise after a build.
+  `dispersion.f90`). `src/*.mod` are symlinks into `src/swd/`. Build products
+  (`*.o`, `*.mod`, `*.a`, `src/bin/`, `src/obj/`) are gitignored.
 - There are no `postpred`/`postlog` sources in this repo any more.
 
 ## Run
