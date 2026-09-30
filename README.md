@@ -295,13 +295,44 @@ per-run `runs/<name>/diagnostics.png`, `results/summary.csv`,
   0.02-0.11 for every one- and two-slot run (<= 0.05 comfortable, >= 0.15
   re-run), 0.21 for the four-slot runs.
 
-## Post-processing
+## Post-processing (`tools/swdell/`, Python)
 
-MATLAB scripts of the original code are in `plotting_scripts/`
-(`rf_plot_rjhist_varpar3.m` draws the interface-probability / Vs / Vp-Vs
-panels). Python equivalents for the sample-file layout above live in the
-masw-das repository (`scripts/rjmcmc_rjhist_panels.py`,
-`scripts/rjmcmc_dam_posterior.py`).
+Readers and figures for the current formats (numpy + matplotlib; the
+posterior-predictive bands also need `validation/disp_driver`, built with the
+command in `validation/README.md`):
+
+```bash
+python tools/plot_rjhist.py RUN_DIR [...]        # -> RUN_DIR/diagnostics.png
+python tools/plot_datafit.py RUN_DIR             # observed vs <base>_mappredSWD.dat of an IMAP run
+python tools/print_map.py RUN_DIR [--k K]        # max-logL sample -> <base>_map_voro.dat (then IMAP 1)
+python tools/plot_overlay.py A=RUN_A B=RUN_B --out fig.png   # Vs(z) bands side by side
+```
+
+`plot_rjhist.py` draws three blocks: **posteriors** (Vs(z) per-depth histogram
+with the 16/50/84 % profile, node-depth density, Vp/Vs(z), p(k) with its
+Poisson prior, the hierarchical sigma of every slot in its own units:
+multiplier for `ICOV_SWD 3`, % of datum for `ICOV_SWD 1` + `IMAGSCALE 1`),
+**convergence** (logL and k per cold chain with the burn-in cut, running
+median Vs at three depths, the L1 stationarity / between-chain / burn-in
+metrics in 68 %-half-width units: <= 0.05 comfortable, >= 0.15 re-run) and
+**data fits** per slot (observed +- sd, MAP prediction if present, predictive
+band, residuals with the reduced chi-square). Synthetic tests add the truth
+with `--truth-map-voro`, `--truth-curves`, `--truth-logl`.
+
+The package (`from swdell import io, model, forward, posterior, plots`)
+mirrors the engine: `io.read_parfile` = `READPARFILE` (48 lines + keyword
+tail, `GRP_OF` over `IGRP`), `io.slot_filename` = `SWD_SLOT_FILE`,
+`io.read_sample` (drops the `-HUGE` rows of an unpredictable start state),
+`model.getref` / `model.engine_stack` = `GETREF` / `INTERPLAYER` /
+`MAKE_CURMOD` + the deep tail of `LOGLHOOD_SWD` (verified layer by layer
+against the engine's printed stack, including inactive node parameters and
+the PREM tail of `example1_partial_coupling`), `forward.predict_slots` =
+`disp_driver` on a posterior subsample. `validation/basel_group/analyze.py`
+is built on it.
+
+The MATLAB scripts of the original code line are in
+`plotting_scripts/legacy/` (they read the old 81-line format only; see the
+README there).
 
 ## References
 

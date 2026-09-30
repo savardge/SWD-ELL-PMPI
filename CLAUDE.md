@@ -69,10 +69,14 @@ unknown lines are ignored. A new setting goes in the keyword tail, never as a
 new positional line, and must be echoed in `PRINTPAR2` and documented in the
 README keyword block. `<base>_covparameter.dat` (35 lines) is positional too.
 
-`plotting_scripts/` is the group's MATLAB toolbox for the *original* 81-line
-format; it does not read this repo's parameter files. Python post-processing
-for the sample-file layout lives in the masw-das repository and in
-`validation/basel_group/analyze.py`.
+Post-processing is the Python package `tools/swdell/` (CLI:
+`tools/plot_rjhist.py`, `plot_datafit.py`, `print_map.py`, `plot_overlay.py`);
+its readers mirror `READPARFILE` / `SWD_SLOT_FILE` and its model
+reconstruction `GETREF` / `INTERPLAYER` / `MAKE_CURMOD`, so a change to any
+of those must be mirrored in `tools/swdell/io.py` / `model.py`.
+`plotting_scripts/` is the group's MATLAB toolbox; the scripts for the
+*original* 81-line format are in `plotting_scripts/legacy/` and do not read
+this repo's files.
 
 ## Architecture
 
@@ -99,7 +103,9 @@ for the sample-file layout lives in the masw-das repository and in
   estimation; single-curve only (refused when `NMODE > 1`).
 - **`validation/`** — forward-model validation against disba
   (`compare_disba.py`, rerun after any change to `swd/`) and the synthetic
-  Basel-1 group-velocity test harness (`basel_group/`).
+  Basel-1 group-velocity test harness (`basel_group/`, built on `tools/swdell`).
+- **`tools/swdell/`** — post-processing package (see Input / output
+  conventions above).
 
 ## Gotchas
 

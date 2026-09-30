@@ -23,6 +23,7 @@ ssh bamboo 'cd /srv/beegfs/scratch/users/s/savardg/swd_group_basel && sbatch --a
 # ---- back on the Mac ----
 rsync -a bamboo:/srv/beegfs/scratch/users/s/savardg/swd_group_basel/runs/ runs/
 $PY analyze.py             # runs/<name>/diagnostics.png, results/summary.csv, figures/overlay_*.png
+                           # (built on tools/swdell; any run dir: python tools/plot_rjhist.py RUN_DIR)
 ```
 
 ## Design
