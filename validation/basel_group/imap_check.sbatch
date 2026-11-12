@@ -11,6 +11,8 @@
 # noise is ~1e-5). Runs in a scratch copy so the committed
 # example is untouched.   sbatch --output=logs/%x_%j.out imap_check.sbatch
 set -eu
+# baobab runs batch scripts in a non-login shell without Lmod: source the profile when `module` is missing
+type module >/dev/null 2>&1 || { set +eu; . /etc/profile || true; set -eu; }
 module load foss/2025b
 REPO=${REPO:-$HOME/Codes/SWD-ELL-PMPI}
 WORK=${SCRATCH_ROOT:-/srv/beegfs/scratch/users/s/savardg/swd_group_basel}/imap_check

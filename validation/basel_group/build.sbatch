@@ -10,6 +10,8 @@
 #   sbatch --output=logs/%x_%j.out build.sbatch
 # Then the Linux regression: sbatch imap_check.sbatch (must print logL = 160.74617935123956).
 set -eu
+# baobab runs batch scripts in a non-login shell without Lmod: source the profile when `module` is missing
+type module >/dev/null 2>&1 || { set +eu; . /etc/profile || true; set -eu; }
 module load foss/2025b
 REPO=${REPO:-$HOME/Codes/SWD-ELL-PMPI}
 cd "$REPO/src"

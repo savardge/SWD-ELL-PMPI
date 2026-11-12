@@ -14,6 +14,8 @@
 # Partitions are named explicitly: bamboo also has *-arm partitions where this
 # x86 build cannot run.
 set -eu
+# baobab runs batch scripts in a non-login shell without Lmod: source the profile when `module` is missing
+type module >/dev/null 2>&1 || { set +eu; . /etc/profile || true; set -eu; }
 module load foss/2025b
 REPO=${REPO:-$HOME/Codes/SWD-ELL-PMPI}
 BIN="$REPO/src/bin/prjmh_temper_rf"
