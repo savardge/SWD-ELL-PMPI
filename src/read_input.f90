@@ -97,6 +97,10 @@ READ(20,*) I_SET_RANGE_ELL !! 48
 !!                        of validity when evaluating the polynomial. 0 (default)
 !!                        keeps the legacy 2.35 + 0.036 (Vp-3)^2 g/cc, which is a
 !!                        crustal relation and gives ~2.6 g/cc for a 175 m/s soil.
+!!   RHO_LINEAR a b       density = a*Vp[km/s] + b [g/cc] for the sampled layers AND
+!!                        the deep tail (0.32 0.77 = BayHunter's relation, for
+!!                        engine comparisons). a <= 0 (default) = off; when on it
+!!                        overrides RHO_BROCHER and the legacy relation.
 !!   MODE_OF m1 m2 ...    Rayleigh mode number of each SWD curve slot (NMODE
 !!                        ascending integers >= 0). Slot files are named by
 !!                        mode: <base>_SWD.dat (mode 0), <base>_SWD_M<m>.dat.
@@ -158,6 +162,12 @@ DO
     READ(kwline(ipos:),*,IOSTAT=io_kw) VP_BROCHER
   CASE ('RHO_BROCHER')
     READ(kwline(ipos:),*,IOSTAT=io_kw) RHO_BROCHER
+  CASE ('RHO_LINEAR')
+    READ(kwline(ipos:),*,IOSTAT=io_kw) RHO_LINEAR
+    IF(io_kw /= 0)THEN
+      WRITE(6,*) 'ERROR: RHO_LINEAR needs two reals a b (rho = a*Vp + b): ',TRIM(kwline)
+      STOP
+    ENDIF
   CASE ('MODE_OF')
     READ(kwline(ipos:),*,IOSTAT=io_kw) MODE_OF
     IF(io_kw /= 0)THEN
@@ -483,6 +493,7 @@ IMPLICIT NONE
   WRITE(6,*) 'DVSMONO    = ', DVSMONO
   WRITE(6,*) 'VP_BROCHER = ', VP_BROCHER
   WRITE(6,*) 'RHO_BROCHER= ', RHO_BROCHER
+  WRITE(6,*) 'RHO_LINEAR = ', RHO_LINEAR
   WRITE(6,*) 'MODE_OF    = ', MODE_OF
   WRITE(6,*) 'IGRP       = ', IGRP
   WRITE(6,*) 'GRP_OF     = ', GRP_OF, '  (0 phase, 1 group)'

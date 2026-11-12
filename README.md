@@ -127,6 +127,9 @@ RHO_BROCHER 1                  density from Vp by Brocher (2005, eq. 1, Nafe-Dra
                                to the polynomial's 1.5-8.5 km/s range. Default 0 = the legacy
                                2.35 + 0.036 (Vp-3)^2 g/cc, a CRUSTAL relation that returns ~2.6 g/cc
                                for a 175 m/s soil (the flat density in vel_ref only feeds the tail)
+RHO_LINEAR 0.32 0.77           density = a·Vp(km/s) + b (g/cc) for the sampled layers and the tail;
+                               0.32 0.77 reproduces BayHunter (engine comparisons). Default off
+                               (a <= 0); when on it overrides RHO_BROCHER and the legacy relation
 MODE_OF  0 2                   Rayleigh mode number of each curve slot (NMODE integers
                                >= 0). Files are named by mode (_SWD.dat, _SWD_M2.dat);
                                "0 2" fits the fundamental + second higher mode with no R1.

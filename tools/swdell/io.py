@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-KEYWORDS = ("DVSCON", "DVSMONO", "VP_BROCHER", "RHO_BROCHER", "MODE_OF", "GRP_OF", "IGRP",
+KEYWORDS = ("DVSCON", "DVSMONO", "VP_BROCHER", "RHO_BROCHER", "RHO_LINEAR", "MODE_OF", "GRP_OF", "IGRP",
             "SDMN_SWD", "SDMX_SWD", "SWD_SCAN", "SWD_WARM")
 
 # the 48 positional lines of READPARFILE, in order
@@ -62,7 +62,7 @@ def read_parfile(path):
         else:
             cfg[name] = float(tok[0])
     nmode = cfg["NMODE"]
-    cfg.update({"DVSCON": -1.0, "DVSMONO": -1.0, "VP_BROCHER": 0, "RHO_BROCHER": 0, "IGRP": 0,
+    cfg.update({"DVSCON": -1.0, "DVSMONO": -1.0, "VP_BROCHER": 0, "RHO_BROCHER": 0, "RHO_LINEAR": [-1.0, 0.0], "IGRP": 0,
                 "SWD_SCAN": [2.0, 6.5, 0.05, -1.0], "SWD_WARM": -1,
                 "MODE_OF": list(range(nmode)), "GRP_OF": None, "SDMN_SWD": None, "SDMX_SWD": None})
     for l in lines[48:]:
@@ -74,6 +74,8 @@ def read_parfile(path):
             cfg[kw] = float(rest[0])
         elif kw in ("VP_BROCHER", "RHO_BROCHER", "IGRP", "SWD_WARM"):
             cfg[kw] = int(rest[0])
+        elif kw == "RHO_LINEAR":
+            cfg[kw] = [float(rest[0]), float(rest[1])]
         elif kw in ("MODE_OF", "GRP_OF"):
             cfg[kw] = [int(x) for x in rest[:nmode]]
         elif kw in ("SDMN_SWD", "SDMX_SWD"):

@@ -43,6 +43,7 @@ MODULE RJMCMC_COM
    INTEGER(KIND=IB),ALLOCATABLE,DIMENSION(:) :: GRP_OF     !! velocity type of each curve slot: 0 = phase, 1 = group (keyword GRP_OF; default = IGRP)
    REAL(KIND=RP),ALLOCATABLE,DIMENSION(:)    :: SDMN_SWD   !! per-slot hierarchical sigma prior lower bound (keyword SDMN_SWD; default sdmn(1))
    REAL(KIND=RP),ALLOCATABLE,DIMENSION(:)    :: SDMX_SWD   !! per-slot hierarchical sigma prior upper bound (keyword SDMX_SWD; default sdmx(1))
+   REAL(KIND=RP)    :: RHO_LINEAR(2) = (/ -1._RP, 0._RP /)  !! a b: density = a*Vp[km/s] + b [g/cc] (keyword RHO_LINEAR, e.g. 0.32 0.77 = BayHunter); a <= 0 = off. Overrides RHO_BROCHER
    REAL(KIND=RP)    :: DVSCON   = -1._RP   !! max |adjacent-layer dVs| [km/s] indicator prior (keyword DVSCON; < 0 = off)
    REAL(KIND=RP)    :: DVSMONO  = -1._RP   !! max ALLOWED adjacent-layer Vs DECREASE with depth [km/s] (keyword DVSMONO; < 0 = off)
    INTEGER(KIND=IB) :: VP_BROCHER  = 0  !! 1 = Vp from Vs via Brocher (2005) eq. 9 (keyword VP_BROCHER); overrides the Vp/Vs ratio

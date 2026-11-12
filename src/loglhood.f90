@@ -138,6 +138,11 @@ IF(VP_BROCHER == 1 .OR. RHO_BROCHER == 1)THEN
        curmod2(obj%nunique+2:obj%nunique+1+NPREM,3), &
        curmod2(obj%nunique+2:obj%nunique+1+NPREM,2))
 ENDIF
+IF(RHO_LINEAR(1) > 0._RP)THEN
+  !! keep the tail's density on the same linear relation as the sampled layers
+  curmod2(obj%nunique+2:obj%nunique+1+NPREM,2) = &
+       RHO_LINEAR(1)*curmod2(obj%nunique+2:obj%nunique+1+NPREM,3) + RHO_LINEAR(2)*1000._RP
+ENDIF
 IF(IMAP == 1)THEN
   WRITE(*,*) 'curmod2 (including PREM)'
   DO ilay=1,obj%nunique+1+NPREM+1
@@ -638,6 +643,10 @@ curmod(1:obj%nunique+1,2) = (2.35+0.036*((curmod(1:obj%nunique+1,3)/1000.)-3.0)*
 IF(VP_BROCHER == 1 .OR. RHO_BROCHER == 1)THEN
   CALL APPLY_BROCHER(obj%nunique+1,curmod(1:obj%nunique+1,4), &
        curmod(1:obj%nunique+1,3),curmod(1:obj%nunique+1,2))
+ENDIF
+!! Optional linear density (keyword RHO_LINEAR a b; units here: Vp m/s, rho kg/m^3)
+IF(RHO_LINEAR(1) > 0._RP)THEN
+  curmod(1:obj%nunique+1,2) = REAL((RHO_LINEAR(1)*curmod(1:obj%nunique+1,3)/1000._RP + RHO_LINEAR(2))*1000._RP,SP)
 ENDIF
 
 !!

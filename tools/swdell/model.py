@@ -114,6 +114,8 @@ def engine_stack(z, dvs, dvpvs, cfg, vel_ref, vel_prem):
         vp = brocher_vp(vs)
     if cfg["RHO_BROCHER"] == 1:
         rho = brocher_rho(vp)
+    if cfg.get("RHO_LINEAR", [-1.0, 0.0])[0] > 0:
+        rho = cfg["RHO_LINEAR"][0] * vp + cfg["RHO_LINEAR"][1]
     th = np.r_[np.diff(z), vel_prem[0, 0] - z[-1]]
     # tail: vel_prem Vs / VpVs shifted by the deepest ACTIVE node's perturbations
     factvs = dvs[np.isfinite(dvs)][-1] if np.any(np.isfinite(dvs)) else 0.0
@@ -125,5 +127,7 @@ def engine_stack(z, dvs, dvpvs, cfg, vel_ref, vel_prem):
         tvp = brocher_vp(tvs)
     if cfg["RHO_BROCHER"] == 1:
         trho = brocher_rho(tvp)
+    if cfg.get("RHO_LINEAR", [-1.0, 0.0])[0] > 0:
+        trho = cfg["RHO_LINEAR"][0] * tvp + cfg["RHO_LINEAR"][1]
     tth = np.r_[np.diff(vel_prem[:, 0]), 0.0]
     return np.column_stack([np.r_[th, tth], np.r_[rho, trho], np.r_[vp, tvp], np.r_[vs, tvs]])
