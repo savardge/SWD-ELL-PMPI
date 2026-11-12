@@ -11,3 +11,6 @@ src/replica
 # run outputs
 *_voro_sample.txt
 *_run.log
+
+# macOS Finder metadata
+.DS_Store

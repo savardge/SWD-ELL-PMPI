@@ -20,7 +20,9 @@ from swdell import forward, io, model  # noqa: E402
 ENGINE = os.path.join(REPO, "src", "bin", "prjmh_temper_rf")
 DISP_DRIVER = forward.DISP_DRIVER
 
-WELL_DIR = "/Volumes/T7blue/riehen-data/well-data"
+# Directory holding the Michel et al. (2017) well-model files (not distributed
+# with this repo). Point SWD_WELL_DIR at it; default: data/well next to this file.
+WELL_DIR = os.environ.get("SWD_WELL_DIR", os.path.join(HERE, "data", "well"))
 MICHEL_MODEL = os.path.join(WELL_DIR, "Michel2016_gpdc.model")        # thick m, Vp, Vs m/s, rho kg/m3
 MICHEL_CSV = os.path.join(WELL_DIR, "Vsmodel_well_Basel1_Otterbach_Michel2016.csv")
 MICHEL_DISP = os.path.join(WELL_DIR, "Michel2016_gpdc.disp")          # gpdc: frequency, slowness

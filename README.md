@@ -1,41 +1,40 @@
 # SWD-ELL-PMPI
 
-Trans-dimensional (reversible-jump MCMC, parallel-tempered, MPI) Bayesian
-inversion of **surface-wave dispersion (SWD) and Rayleigh-wave ellipticity
-(ELL)** for 1-D shear-wave velocity structure, with **multi-mode Rayleigh
-dispersion** (any set of mode branches, each on its own period grid) and an
-optional **adjacent-layer contrast constraint**.
+Trans-dimensional (rjMcMC, parallel-tempered, MPI) Bayesian inversion of
+surface-wave dispersion (SWD) and Rayleigh ellipticity (ELL) for 1-D Vs, with
+multi-mode phase and group curves (each on its own period grid) and optional
+adjacent-layer contrast constraints.
 
-Repository: [savardge/SWD-ELL-PMPI](https://github.com/savardge/SWD-ELL-PMPI)
-(renamed from RF-SWD-ELL-MT-PMPI), a fork of
-[pejman-sh86/RF-SWD-ELL-MT-PMPI](https://github.com/pejman-sh86/RF-SWD-ELL-MT-PMPI)
-(Jan Dettmer's rjMcMC code line). Relative to that upstream (all on `main`):
+Fork of [pejman-sh86/RF-SWD-ELL-MT-PMPI](https://github.com/pejman-sh86/RF-SWD-ELL-MT-PMPI)
+(Jan Dettmer's code line). Changes: receiver-function and MT paths removed
+(still in the git history); ported from NVHPC to gfortran + Open MPI; the
+keywords below added. `MODE_OF`, `DVSCON` and `SWD_SCAN` were ported from
+`receiver_rjmcmc_varpar_sourceinv_joint` and reproduce it bit-for-bit; the rest
+is new here. The ELL forward call (geopsy `gpell`) is commented out upstream,
+so ELL inversion needs that library wired back in.
 
-- the receiver-function (RF) and magnetotelluric (MT) machinery has been
-  **removed** (raysum/ray3d forward codes, MT1D forward, their data paths,
-  proposals, covariance iterations and parameter-file lines). The original
-  joint RF-SWD-ELL-MT code is in the git history and in the upstream repo;
-- the ellipticity path is kept as in the upstream code. NOTE: its forward
-  call (`ellipticity_gpell`, geopsy's gpell library) is commented out in the
-  upstream source, so ELL inversion currently needs that library to be wired
-  back in;
-- ported from the NVIDIA HPC SDK to **gfortran + Open MPI** (macOS arm64 and
-  Linux); see `src/Makefile.compiler`.
+## References
 
-Everything below the "Multi-mode SWD" heading was ported from
-`receiver_rjmcmc_varpar_sourceinv_joint` (branch `multimode-raydsp`) and is
-validated to reproduce it bit-for-bit (see Validation).
+Original code (cite when using it):
+
+- Shahsavari, P., Dettmer, J., Unsworth, M. J., & Schaeffer, A. (2025). Multiphysics inversion with variable complexity of receiver-function, surface-wave dispersion and magnetotelluric data reduces uncertainty for lithosphere structure. arXiv:2510.15779. https://doi.org/10.48550/arXiv.2510.15779
+- Shahsavari, P., Dettmer, J., Unsworth, M. J., & Schaeffer, A. (2022). Data and model appraisal for joint inversion of magnetotelluric, receiver function, Rayleigh wave dispersion, and horizontal to vertical amplitude ratio (HV) data. AGU Fall Meeting 2022, S15B-03.
+
+Methods:
+
+- Dettmer, J., Molnar, S., Steininger, G., Dosso, S. E., & Cassidy, J. F. (2012). Trans-dimensional inversion of microtremor array dispersion data with hierarchical autoregressive error models. *Geophys. J. Int.*, 188(2), 719–734. https://doi.org/10.1111/j.1365-246X.2011.05302.x
+- Dettmer, J., & Dosso, S. E. (2012). Trans-dimensional matched-field geoacoustic inversion with hierarchical error models and interacting Markov chains. *J. Acoust. Soc. Am.*, 132(4), 2239–2250. https://doi.org/10.1121/1.4746016
+- Dettmer, J., Dosso, S. E., Bodin, T., Stipčević, J., & Cummins, P. R. (2015). Direct-seismogram inversion for receiver-side structure with uncertain source–time functions. *Geophys. J. Int.*, 203(2), 1373–1387. https://doi.org/10.1093/gji/ggv375
+- Kennett, B. L. N. (2023). Interacting seismic waveguides: multimode surface waves and leaking modes. *Seismica*, 2(1). https://doi.org/10.26443/seismica.v2i1.282 (`DVSCON`)
+- Kennett, B. L. N. (2026). Higher modes in the near surface: the influence of gradients. *Seismica*, 5(2). https://doi.org/10.26443/seismica.v5i2.2404 (`DVSCON`)
 
 ## Build
 
 ```
-git clone git@github.com:savardge/SWD-ELL-PMPI.git
-cd SWD-ELL-PMPI/src
-make            # gfortran/mpif90; LAPACK via -framework Accelerate (macOS)
+cd src && make     # gfortran/mpif90
 ```
-On Linux replace `LIB = -framework Accelerate` in `src/Makefile` by
-`-llapack -lblas`. Flags are in `src/Makefile.compiler` (the NVHPC original is
-kept as `Makefile.compiler.nvhpc`).
+LAPACK: Accelerate on macOS, `-lflexiblas` elsewhere; override with
+`make LIB="-llapack -lblas"`. Flags in `src/Makefile.compiler`.
 
 ## Run
 
@@ -53,7 +52,7 @@ mpirun -np 12 ../../src/bin/prjmh_temper_rf
 | `<base>_SWD.dat` | fundamental-mode phase-velocity curve: `period(s) velocity(km/s)`, ascending period |
 | `<base>_SWD_M<m>.dat` | higher-mode phase curves, one per mode number `m` listed in `MODE_OF` |
 | `<base>_SWDG.dat`, `<base>_SWDG_M<m>.dat` | **group**-velocity curves (slots with `GRP_OF = 1`), same format |
-| `<base>_sdSWD.dat`, `<base>_sdSWD_M<m>.dat`, `<base>_sdSWDG*.dat` | `ICOV_SWD = 3` only: per-point standard deviations (km/s), one file per curve slot named like the data files, same row order and count as the data file. The likelihood divides residuals by these AND by the curve's sampled `sdparSWD`, so `sdparSWD` becomes a dimensionless scale (set `sdmn`/`sdmx` accordingly, or `ISD_SWD = 0` to fix it at the `map_voro` value, typically 1). A missing or short file, or a non-positive sd, is fatal at read time (2026-09-08; the earlier build read mode slot 1 only and left other slots at zero) |
+| `<base>_sdSWD.dat`, `<base>_sdSWD_M<m>.dat`, `<base>_sdSWDG*.dat` | `ICOV_SWD = 3` only: per-point sd (km/s), one file per slot, same rows as its data file. `sdparSWD` then becomes a dimensionless scale (bound it ~1, or `ISD_SWD = 0`). Missing/short file or sd <= 0 is fatal |
 | `<base>_ELL.dat` | ellipticity data (if `I_ELL = 1`) |
 | `<base>_vel_ref.txt` | reference Vs model when `I_VREF = 1` (node velocities are perturbations around it) |
 | `<base>_map_voro.dat` | starting model: `k`, `NLMX*NPL` node triplets (depth km, dVs, dVpVs; unused slots 0), `sdparSWD(NMODE)`, `sdparELL(NMODE_ELL)`, `arparSWD(NMODE)`, `arparELL(NMODE_ELL)` |
@@ -62,6 +61,7 @@ Output `<base>_voro_sample.txt`: one row per kept sample =
 `logL, logPr, tcmp, k, voro(NLMX*NPL), sdparSWD, sdparELL, arparSWD, arparELL,
 acc_ratio, iaccept_bd, ireject_bd, iaccept_bds, chain, source_rank`.
 Split burn-in per `source_rank` (last column).
+
 
 ### Parameter file (positional lines)
 
@@ -108,238 +108,47 @@ Split burn-in per `source_rank` (last column).
 ```
 Trailing lines that are not keywords are ignored.
 
-### Multi-mode SWD: keyword lines (anywhere after line 48)
+### Keyword lines (anywhere after line 48)
 
-```
-DVSCON   0.100                 max |adjacent-layer dVs| in km/s: indicator prior evaluated
-                               on the final layer stack BEFORE the forward call (Kennett
-                               2023/2026 Seismica; BayHunter lvz/hvz parity). Absent/<0 = off
-DVSMONO  0.050                 one-sided DVSCON: max ALLOWED adjacent-layer Vs DECREASE with
-                               depth in km/s. 0 = strictly non-decreasing; a small tolerance
-                               admits the metre-scale softening real boring logs show while
-                               excluding a fast lid over a much slower layer. Same indicator
-                               prior, checked before the forward. Absent/<0 = off. Also
-                               enables the warm start (no LVZ can exist, so it is exact)
-VP_BROCHER 1                   Vp from Vs by Brocher (2005, BSSA 95, eq. 9), valid 0 < Vs < 4.5 km/s.
-                               The sampled Vp/Vs is then ignored (leave dVpVs tiny). Also applied
-                               to the deep half-space tail. Default 0
-RHO_BROCHER 1                  density from Vp by Brocher (2005, eq. 1, Nafe-Drake fit), Vp clamped
-                               to the polynomial's 1.5-8.5 km/s range. Default 0 = the legacy
-                               2.35 + 0.036 (Vp-3)^2 g/cc, a CRUSTAL relation that returns ~2.6 g/cc
-                               for a 175 m/s soil (the flat density in vel_ref only feeds the tail)
-RHO_LINEAR 0.32 0.77           density = a·Vp(km/s) + b (g/cc) for the sampled layers and the tail;
-                               0.32 0.77 reproduces BayHunter (engine comparisons). Default off
-                               (a <= 0); when on it overrides RHO_BROCHER and the legacy relation
-MODE_OF  0 2                   Rayleigh mode number of each curve slot (NMODE integers
-                               >= 0). Files are named by mode (_SWD.dat, _SWD_M2.dat);
-                               "0 2" fits the fundamental + second higher mode with no R1.
-                               Absent = 0 1 ... NMODE-1
-IGRP     0                     0 = phase velocity (default), 1 = group velocity: the type
-                               of every slot unless GRP_OF is given
-GRP_OF   0 1                   velocity type per curve slot (NMODE values, 0 phase, 1 group).
-                               "MODE_OF 0 0" + "GRP_OF 0 1" inverts R0 phase + R0 group
-                               jointly, each with its own period grid, hierarchical sigma
-                               and AR parameter (phase and group are measured independently
-                               and carry different noise). Group slots read _SWDG*.dat /
-                               _sdSWDG*.dat. The (mode, type) pairs must be unique; order is
-                               free. A phase and a group slot of the same mode on the same
-                               period grid share ONE root search: DISPER80 evaluates the
-                               analytic group velocity (energy integrals) at every phase root
-SDMN_SWD 0.3 0.3               per-slot lower / upper bounds of the hierarchical-sigma prior
-SDMX_SWD 3.0 3.0               (NMODE values each; absent = the scalar sdmn/sdmx of lines
-                               33/34 for every slot). The map_voro start value of every slot
-                               must lie inside its bounds when ISD_SWD = 1 (fatal otherwise)
-SWD_SCAN 0.08 1.6 0.005 0.001  DISPER80 root-scan window cmin cmax and step dc in km/s,
-                               optional overtone step dc_over (default dc/5). Default
-                               2.0 6.5 0.05 (crustal); near-surface work needs the
-                               values shown (give dc_over explicitly for bit-reproducible
-                               runs across builds)
-SWD_WARM 1                     warm-started root scan (see below): 1 on, 0 off,
-                               -1 (default) on iff DVSCON > 0 or DVSMONO >= 0
-```
+| keyword (example) | meaning; default |
+|---|---|
+| `MODE_OF 0 2` | Rayleigh mode number of each curve slot; files named by mode (`_SWD_M2.dat`). Default `0 1 ... NMODE-1` |
+| `IGRP 0` | 0 phase, 1 group, for every slot unless `GRP_OF` is given |
+| `GRP_OF 0 1` | velocity type per slot. `MODE_OF 0 0` + `GRP_OF 0 1` = joint R0 phase + group, each with its own grid, sigma and AR term; (mode, type) pairs must be unique. Phase and group of one mode on one grid share a root search |
+| `SDMN_SWD 0.3 0.3`, `SDMX_SWD 3.0 3.0` | per-slot bounds of the hierarchical-sigma prior. Default: lines 33/34. The `map_voro` start must lie inside them |
+| `DVSCON 0.100` | max \|adjacent-layer dVs\| (km/s), checked before the forward call (BayHunter lvz/hvz parity). Default off |
+| `DVSMONO 0.050` | max allowed Vs *decrease* with depth (km/s); 0 = non-decreasing. Default off |
+| `SWD_SCAN 0.08 1.6 0.005 0.001` | root scan `cmin cmax dc [dc_over]` (km/s). Default `2.0 6.5 0.05`, dc_over = dc/5; near-surface needs smaller values. Use `dc` 0.003 when Vp/Vs > 2 (see `docs/root_scan.md`) |
+| `SWD_WARM 1` | warm-started root scan, 2-8x faster, bit-identical (see `docs/root_scan.md`). Default on iff `DVSCON > 0` or `DVSMONO >= 0` |
+| `VP_BROCHER 1` | Vp from Vs, Brocher (2005) eq. 9; sampled Vp/Vs ignored. Default 0 |
+| `RHO_BROCHER 1` | density from Vp, Brocher (2005) eq. 1. Default: legacy crustal 2.35 + 0.036 (Vp-3)^2 |
+| `RHO_LINEAR 0.32 0.77` | density = a·Vp + b (g/cc); 0.32 0.77 = BayHunter. Overrides `RHO_BROCHER`. Default off |
 
-The n-th Rayleigh mode is found by counting sign changes of the DISPER80
-secular function along the c-scan (`swd/raydsp.f`, `RAYDSPN`). A model that
-cannot produce an observed mode at an observed period is rejected (dropping
-the point instead would let the likelihood reward vanishing modes). Each
-curve carries its own hierarchical sigma.
+Mode *n* is the *n*-th sign change of the DISPER80 secular function along the
+c-scan; a model that cannot produce an observed mode at an observed period is
+rejected. `ICOV_SWD = 2` and `Icov_iterUpdate_SWD = 1` hold one matrix for all
+curves and are refused when `NMODE > 1`.
 
-Limitation: `ICOV_SWD = 2` (inverse covariance from a file) and the iterative
-covariance estimation (`Icov_iterUpdate_SWD = 1`) hold a single
-`NDAT_SWD x NDAT_SWD` matrix for all curves and are refused when `NMODE > 1`.
+`tools/convert_legacy_inputs.py {rfswdellmt|receiver} SRC DST` converts the old
+81-line RF-SWD-ELL-MT or 44/46-line receiver formats.
 
-### Warm-started root scan (speed)
+## Validation
 
-DISPER80 brackets a root by scanning phase velocity from `cmin` in steps of
-`dc` and counting sign changes, and the original code repeats that scan from
-`cmin` for every period and every mode: at the overtone step (dc = 1 m/s)
-about 850 propagator calls per period. Because a mode's phase velocity rises
-with period, the previous period's root is a lower bound for the next one, so
-the scan can start just below it (`SWD_WARM`, on by default when `DVSCON` is
-active):
+- `example1_partial_coupling/SWD` IMAP logL 160.74617935123956 (macOS arm64,
+  gfortran 16); x86 GCC 14: 160.74615570403239 (single-precision noise).
+- HVC dam inputs: IMAP logL identical to the last digit to the receiver code
+  (R0, R0+R1+R2 with `DVSCON`, `MODE_OF 0 2`), and a 160k-sample seeded run
+  reproduces its posterior (medians to 1 m/s, same 68 % bands).
+- Forward model vs disba: `validation/README.md`. Phase + group synthetic
+  (Basel well model, `GRP_OF`): `validation/basel_group/README.md`.
 
-| | propagator calls | speed-up |
-|---|---|---|
-| fundamental | scan from cmin -> from the previous root | 2.3-3.2x |
-| overtones | " | 7.4-7.6x |
-
-The scan GRID is untouched (the start is the grid point `cmin + K*dc` below
-the bound), so an accepted warm scan returns the same bracket, and therefore a
-**bit-identical** root, as the cold scan. Three checks keep that true:
-
-1. **sign-parity certificate** (in `RAYDSPN`): the secular function changes
-   sign at every root, so the parity of `sign F(cstart)/sign F(cmin)` counts
-   the roots skipped. It must be the mode number; if it is not, the routine
-   reverts to the cold scan by itself, at the cost of one propagator call.
-2. **no crossing / implausible jump** (in `dispersion`): the period is redone
-   cold if the warm scan finds nothing above its start, or lands more than
-   `CWFWD` above the previous root.
-3. **monotonicity audit**: if the finished curve ever decreases with period --
-   the signature of a model whose roots move down faster than the warm window
-   -- the whole curve is recomputed cold.
-
-Limit: a strongly inverse-dispersive model (a fast lid over a slow channel)
-can move a root down past TWO roots at once, which parity cannot see. Such
-models only exist when the adjacent-layer contrast is unconstrained, so with
-`SWD_WARM -1` (the default) the warm start is enabled only when `DVSCON > 0`
-or `DVSMONO >= 0` (a monotonic profile cannot have a channel at all);
-`SWD_WARM 1` forces it on, `SWD_WARM 0` off.
-
-**Root-scan step and high Vp/Vs.** The fundamental root is found by a sign-change
-scan in steps of `dc` (`SWD_SCAN`). For soft, high-Vp/Vs stacks (saturated soil,
-Vp/Vs 4-8) the default 5 m/s step can step over the root pair and the model is
-rejected as if no mode existed: one 175/300/900 m/s test model was rejected at
-`dc` 0.005 and fine at 0.002, with the same logL to 4 digits at 0.002 and 0.001.
-On 60 posterior-like structures under Brocher Vp/density, 59 were valid at 0.005
-and all 60 at 0.003, so use `SWD_SCAN 0.08 2.5 0.003 0.001` (1.7x the cost) for
-any run that leaves the Vp/Vs = 2 regime. Validation of the Brocher path: the
-layer stack the engine prints matches an independent implementation to four
-digits (Vp to 0.0001 m/s, density exactly) and the predicted dispersion matches
-disba on that stack to 0.00 m/s; with both keywords off the predicted data are
-byte-identical to the previous binary (`bin/prjmh_temper_rf.pre_brocher`).
-
-Validation (`swd/test_warm_driver.f90`, `tools/export_test_models.py`): warm
-and cold curves compared on 15 000 models drawn from the real HVC posteriors
-(v2 R0+R1+R2, v3 R0..R3, and the NLMX = 30 / hmin = 2 m run), all three modes
--- **zero differing periods, zero differing validity patterns**. On 4 000
-models of the unconstrained fast-lid posterior the fundamental and first
-overtone are still exact and the second overtone differs at 0.2 % of periods,
-which is the regime the default switch excludes.
-
-### Converting older inputs
-
-`tools/convert_legacy_inputs.py {rfswdellmt|receiver} SRC_DIR DST_DIR`
-converts run directories from the original 81-line RF-SWD-ELL-MT format or
-from `receiver_rjmcmc_varpar_sourceinv_joint` (44/46-line) format.
-
-## Validation (2026-09-02, macOS arm64, gfortran 16 + Open MPI 5)
-
-- `example1_partial_coupling/SWD` IMAP: logL = 160.74617935123956, and the
-  predicted curve is identical to the pre-port build and to the authors'
-  shipped predictions.
-- HVC dam inputs (masw-das campaign), IMAP logL identical to the last digit to
-  `receiver_rjmcmc_varpar_sourceinv_joint/multimode-raydsp`: R0 only
-  (-19.155037748234786), R0+R1+R2 with DVSCON (-260.50604563286140), R0+R2 via
-  `MODE_OF 0 2` (-267.50804914725632), NLMX = 30 / hmin = 2 m
-  (-260.50604563286140).
-- Full-length seeded run (160k kept samples, HVC v2 R0+R1+R2 with DVSCON)
-  against the receiver code's posterior on identical inputs: depth-median
-  Vs offset 0.032 in 68%-half-width units (replicate gate 0.2), medians equal
-  to 1 m/s at every depth, identical 68% bands, per-curve sigma medians
-  24/39/25 m/s in both, identical logL and k medians. The random streams
-  differ because the codes consume the RNG differently.
-
-## Group-velocity synthetic test (2026-09-29, `validation/basel_group/`)
-
-Per-slot phase/group inversion (`GRP_OF`) tested on synthetic Rayleigh curves
-of the Basel-1 / Otterbach-2 well model (Michel et al. 2017; 17 layers to
-3 km, Vs 0.78-3.37 km/s, several LVZs), 30 periods 0.5-6 s, Gaussian noise
-2 % (phase) / 4 % (group), 15 runs of 1 h x 12 ranks on bamboo (design,
-matrix and forward-model checks: `validation/basel_group/README.md`;
-per-run `runs/<name>/diagnostics.png`, `results/summary.csv`,
-`figures/overlay_*.png`).
-
-- **The implementation is correct end to end.** Every run fits its data with
-  reduced chi-square 0.6-0.9 per slot, the hierarchical sigma multiplier of
-  every slot comes back at 0.93-1.17 (expected 1), `R0pg_full_icov1`
-  (`ICOV_SWD 1`, `IMAGSCALE 1`, per-slot bounds) recovers 1.95 % / 3.77 %
-  (truth 2 / 4 %), and `R0pg_mismatch` (group on a different grid, no
-  root-solve reuse) behaves like `R0pg_full`. The engine's
-  IMAP predictions equal `disp_driver`'s slot by slot, and the analytic group
-  velocity matches the gpdc curve shipped with the model to 0.02 %.
-- **What group velocity adds (measured, full band).** Mean 68 % half-width
-  of Vs in 0-1 km: R0 phase 0.172, R0 group 0.165, R0 phase + group
-  0.141 km/s (1-3 km: 0.249 / 0.214 / 0.194); mean |median - truth| in
-  0-1 km 0.34 / 0.32 / 0.32 km/s. So group velocity narrows the bands by
-  ~20 % and the joint run is the tightest, but the posterior median hardly
-  moves: the extra information sharpens the average structure, it does not
-  recover the 26-100 m layers. All R0 runs agree from 1 km down (the
-  2.0-2.4 km/s section is smoothed, the 3 km half-space is exact). Adding R1
-  phase + group starts to resolve the 1.1-1.6 km layering (5/16 true
-  interfaces found by a node-density heuristic vs 2-3), but those runs are
-  6-8x slower (overtone scan) and were not converged in 1 h (stationarity
-  L1 0.21; re-run for 4-6 h). `R0pg_mismatch` (group on 1-4 s only) is
-  consistent with `R0pg_full` with a wider band (0.21 km/s in 0-1 km).
-- **Resolution, not the sampler, limits the recovery -- and the bands are
-  over-confident.** k median 7-9 vs the true 17: the fine layers of the log
-  are below what 0.5-6 s dispersion can see, and the trans-D posterior
-  replaces them by their average. Measured against the blocky truth, the
-  68 % bands contain it at only 13-31 % of depths in 0-1 km and 36-54 % in
-  1-3 km (all runs): the independent-noise likelihood with a hierarchical
-  sigma treats the unresolved layering as absent, not as uncertainty, the
-  usual rjMcMC over-confidence. Interpret the band as the uncertainty of the
-  *smoothed* profile.
-- **Model error.** With curves computed from the literal Michel stack (true
-  Vp and Gardner density, up to 0.28 km/s different from the engine's own
-  density relation), the sampler absorbs the difference into Vs (the profile
-  shifts by less than the band width) rather than into sigma (0.94 / 0.96):
-  the density relation matters at the percent level on this model.
-- Convergence in 1 h: stationarity / between-chain / burn-in L1 metrics
-  0.02-0.11 for every one- and two-slot run (<= 0.05 comfortable, >= 0.15
-  re-run), 0.21 for the four-slot runs.
-
-## Post-processing (`tools/swdell/`, Python)
-
-Readers and figures for the current formats (numpy + matplotlib; the
-posterior-predictive bands also need `validation/disp_driver`, built with the
-command in `validation/README.md`):
+## Post-processing (`tools/`, Python)
 
 ```bash
-python tools/plot_rjhist.py RUN_DIR [...]        # -> RUN_DIR/diagnostics.png
-python tools/plot_datafit.py RUN_DIR             # observed vs <base>_mappredSWD.dat of an IMAP run
-python tools/print_map.py RUN_DIR [--k K]        # max-logL sample -> <base>_map_voro.dat (then IMAP 1)
-python tools/plot_overlay.py A=RUN_A B=RUN_B --out fig.png   # Vs(z) bands side by side
+python tools/plot_rjhist.py RUN_DIR      # posteriors, convergence, data fits -> diagnostics.png
+python tools/plot_datafit.py RUN_DIR     # observed vs IMAP prediction
+python tools/print_map.py RUN_DIR        # max-logL sample -> <base>_map_voro.dat
+python tools/plot_overlay.py A=RUN_A B=RUN_B --out fig.png
 ```
-
-`plot_rjhist.py` draws three blocks: **posteriors** (Vs(z) per-depth histogram
-with the 16/50/84 % profile, node-depth density, Vp/Vs(z), p(k) with its
-Poisson prior, the hierarchical sigma of every slot in its own units:
-multiplier for `ICOV_SWD 3`, % of datum for `ICOV_SWD 1` + `IMAGSCALE 1`),
-**convergence** (logL and k per cold chain with the burn-in cut, running
-median Vs at three depths, the L1 stationarity / between-chain / burn-in
-metrics in 68 %-half-width units: <= 0.05 comfortable, >= 0.15 re-run) and
-**data fits** per slot (observed +- sd, MAP prediction if present, predictive
-band, residuals with the reduced chi-square). Synthetic tests add the truth
-with `--truth-map-voro`, `--truth-curves`, `--truth-logl`.
-
-The package (`from swdell import io, model, forward, posterior, plots`)
-mirrors the engine: `io.read_parfile` = `READPARFILE` (48 lines + keyword
-tail, `GRP_OF` over `IGRP`), `io.slot_filename` = `SWD_SLOT_FILE`,
-`io.read_sample` (drops the `-HUGE` rows of an unpredictable start state),
-`model.getref` / `model.engine_stack` = `GETREF` / `INTERPLAYER` /
-`MAKE_CURMOD` + the deep tail of `LOGLHOOD_SWD` (verified layer by layer
-against the engine's printed stack, including inactive node parameters and
-the PREM tail of `example1_partial_coupling`), `forward.predict_slots` =
-`disp_driver` on a posterior subsample. `validation/basel_group/analyze.py`
-is built on it.
-
-The MATLAB scripts of the original code line are in
-`plotting_scripts/legacy/` (they read the old 81-line format only; see the
-README there).
-
-## References
-
-- Dettmer, J., Dosso, S. E., Holland, C. W. (2010-2015): trans-dimensional
-  Bayesian inversion papers underlying this code.
-- Kennett, B. L. N. (2023, 2026), Seismica: interacting waveguides and the
-  representation of gradient structures with higher modes (basis of DVSCON).
+Library: `tools/swdell` (see its docstring). Legacy MATLAB scripts:
+`plotting_scripts/legacy/`.

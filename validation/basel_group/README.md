@@ -3,25 +3,25 @@
 Tests the per-slot velocity type (`GRP_OF`: phase and/or group velocity per
 Rayleigh mode, README keyword block) on synthetic Rayleigh dispersion curves
 forward-modelled from the Basel-1 / Otterbach-2 well model of Michel et al.
-(2017) (`/Volumes/T7blue/riehen-data/well-data/Michel2016_gpdc.model`: 17
+(2017) (`Michel2016_gpdc.model`, not distributed; set `SWD_WELL_DIR` to its folder: 17
 layers to 3 km, Vs 0.78-3.37 km/s, several low-velocity zones) at 30
 log-spaced periods between 0.5 and 6 s.
 
 ## Pipeline
 
 ```bash
-PY=/opt/anaconda3/envs/bayesbay_dev/bin/python        # numpy, matplotlib, disba
+PY=python                  # an environment with numpy, matplotlib, disba
 $PY make_synthetics.py     # data/: curves + sd, truth nodes, checks.txt; figures/fig_forward_check.png
 $PY stage_runs.py          # runs/<name>/ (15 engine run dirs) + runs/runs.list
-# ---- bamboo (UNIGE): never run anything on a login node ----
-git push; ssh bamboo 'cd ~/Codes/SWD-ELL-PMPI && git pull'
-ssh bamboo 'cd ~/Codes/SWD-ELL-PMPI/validation/basel_group && sbatch --output=logs/%x_%j.out build.sbatch'
-ssh bamboo 'cd ~/Codes/SWD-ELL-PMPI/validation/basel_group && sbatch --output=logs/%x_%j.out imap_check.sbatch'   # logL 160.74617935123956
-rsync -a runs/ bamboo:/srv/beegfs/scratch/users/s/savardg/swd_group_basel/runs/
-scp run_matrix.sbatch bamboo:/srv/beegfs/scratch/users/s/savardg/swd_group_basel/
-ssh bamboo 'cd /srv/beegfs/scratch/users/s/savardg/swd_group_basel && sbatch --array=0-14 --output=logs/%x_%A_%a.out run_matrix.sbatch'
-# ---- back on the Mac ----
-rsync -a bamboo:/srv/beegfs/scratch/users/s/savardg/swd_group_basel/runs/ runs/
+# ---- cluster (SCRATCH_ROOT = your scratch run dir): never run anything on a login node ----
+git push; ssh bamboo 'cd SWD-ELL-PMPI && git pull'
+ssh bamboo 'cd SWD-ELL-PMPI/validation/basel_group && sbatch --output=logs/%x_%j.out build.sbatch'
+ssh bamboo 'cd SWD-ELL-PMPI/validation/basel_group && sbatch --output=logs/%x_%j.out imap_check.sbatch'   # logL 160.74617935123956
+rsync -a runs/ bamboo:$SCRATCH_ROOT/runs/
+scp run_matrix.sbatch bamboo:$SCRATCH_ROOT/
+ssh bamboo 'cd $SCRATCH_ROOT && sbatch --array=0-14 --output=logs/%x_%A_%a.out run_matrix.sbatch'
+# ---- back on the workstation ----
+rsync -a bamboo:$SCRATCH_ROOT/runs/ runs/
 $PY analyze.py             # runs/<name>/diagnostics.png, results/summary.csv, figures/overlay_*.png
                            # (built on tools/swdell; any run dir: python tools/plot_rjhist.py RUN_DIR)
 ```
@@ -75,6 +75,44 @@ Every one of these must PASS before the inversions are meaningful:
 ## Results
 
 `analyze.py` writes one `diagnostics.png` per run (posteriors with the true
-profile, convergence per chain, data fits per slot) and
-`results/summary.csv`; see the README section "Group-velocity synthetic test"
-for the outcome of the campaign.
+profile, convergence per chain, data fits per slot) and `results/summary.csv`.
+15 runs of 1 h x 12 ranks on bamboo (2026-09-29).
+
+- **The implementation is correct end to end.** Every run fits its data with
+  reduced chi-square 0.6-0.9 per slot, the hierarchical sigma multiplier of
+  every slot comes back at 0.93-1.17 (expected 1), `R0pg_full_icov1`
+  (`ICOV_SWD 1`, `IMAGSCALE 1`, per-slot bounds) recovers 1.95 % / 3.77 %
+  (truth 2 / 4 %), and `R0pg_mismatch` (group on a different grid, no
+  root-solve reuse) behaves like `R0pg_full`. The engine's
+  IMAP predictions equal `disp_driver`'s slot by slot, and the analytic group
+  velocity matches the gpdc curve shipped with the model to 0.02 %.
+- **What group velocity adds (measured, full band).** Mean 68 % half-width
+  of Vs in 0-1 km: R0 phase 0.172, R0 group 0.165, R0 phase + group
+  0.141 km/s (1-3 km: 0.249 / 0.214 / 0.194); mean |median - truth| in
+  0-1 km 0.34 / 0.32 / 0.32 km/s. So group velocity narrows the bands by
+  ~20 % and the joint run is the tightest, but the posterior median hardly
+  moves: the extra information sharpens the average structure, it does not
+  recover the 26-100 m layers. All R0 runs agree from 1 km down (the
+  2.0-2.4 km/s section is smoothed, the 3 km half-space is exact). Adding R1
+  phase + group starts to resolve the 1.1-1.6 km layering (5/16 true
+  interfaces found by a node-density heuristic vs 2-3), but those runs are
+  6-8x slower (overtone scan) and were not converged in 1 h (stationarity
+  L1 0.21; re-run for 4-6 h). `R0pg_mismatch` (group on 1-4 s only) is
+  consistent with `R0pg_full` with a wider band (0.21 km/s in 0-1 km).
+- **Resolution, not the sampler, limits the recovery -- and the bands are
+  over-confident.** k median 7-9 vs the true 17: the fine layers of the log
+  are below what 0.5-6 s dispersion can see, and the trans-D posterior
+  replaces them by their average. Measured against the blocky truth, the
+  68 % bands contain it at only 13-31 % of depths in 0-1 km and 36-54 % in
+  1-3 km (all runs): the independent-noise likelihood with a hierarchical
+  sigma treats the unresolved layering as absent, not as uncertainty, the
+  usual rjMcMC over-confidence. Interpret the band as the uncertainty of the
+  *smoothed* profile.
+- **Model error.** With curves computed from the literal Michel stack (true
+  Vp and Gardner density, up to 0.28 km/s different from the engine's own
+  density relation), the sampler absorbs the difference into Vs (the profile
+  shifts by less than the band width) rather than into sigma (0.94 / 0.96):
+  the density relation matters at the percent level on this model.
+- Convergence in 1 h: stationarity / between-chain / burn-in L1 metrics
+  0.02-0.11 for every one- and two-slot run (<= 0.05 comfortable, >= 0.15
+  re-run), 0.21 for the four-slot runs.

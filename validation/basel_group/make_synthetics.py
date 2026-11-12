@@ -17,7 +17,7 @@ figures/fig_forward_check.png   DISPER80 vs disba (phase, group, group rebuilt
                          from disba's phase curve) and vs gpdc on this model
 
 Run with the disba environment:
-  /opt/anaconda3/envs/bayesbay_dev/bin/python make_synthetics.py
+  SWD_WELL_DIR=/path/to/well-data python make_synthetics.py
 """
 import os
 import sys
@@ -167,7 +167,7 @@ def disba_check(name, stack, periods, ours, fh, tol_c=0.02e-3, tol_u=0.01):
     try:
         db = disba_curves(stack, periods)
     except ImportError:
-        log(fh, "[SKIP] disba not importable in this python; run under /opt/anaconda3/envs/bayesbay_dev")
+        log(fh, "[SKIP] disba not importable in this python; run in an environment with disba installed")
         return None, None
     rep = {}
     allc = np.array([db[m]["c"] for m in db])           # (nmodes, nper)
